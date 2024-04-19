@@ -47,3 +47,17 @@ export const destination = [
     "Gravity Hills",
     "Pandora"
 ];
+
+export const dummyData = {
+    nodes: [
+      { id: "Tesla, Inc.", group: 1 },
+      { id: "McAfee", group: 2 },
+      { id: "ILOVEYOU", group: 2 },
+      { id: "I Love You", group: 3 },
+    ],
+    links: [
+      { source: "Tesla, Inc.", target: "McAfee" },
+      { source: "McAfee", target: "ILOVEYOU" },
+      { source: "ILOVEYOU", target: "I Love You" },
+    ],
+  };

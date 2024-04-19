@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { source, destination } from "./data";
+import { source, destination, dummyData } from "./data";
+import Graph from "../components/chart";
 
 export default function Search() {
   const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
@@ -41,29 +42,26 @@ export default function Search() {
     }
 
     try {
-      const response = await fetch(
-        `http://localhost:4000/search/BFS`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ start: sourceInput, goal: destinationInput }),
-        }
-      );
+      const response = await fetch(`http://localhost:4000/search/BFS`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ start: sourceInput, goal: destinationInput }),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Data received:', data);
+      console.log("Data received:", data);
 
       // Update state with the response data
       setShowResult(true);
       setPaths(data.paths.length);
-      setDegrees(data.degrees); 
-      setExecutionTime(data.executionTime); 
+      setDegrees(data.degrees);
+      setExecutionTime(data.executionTime);
     } catch (error) {
       console.error("There was an error!", error);
     }
@@ -128,16 +126,37 @@ export default function Search() {
           Go!
         </button>
       </div>
-      {showResult && (
+      {/* {showResult && (
         <div className="result flex items-center justify-center">
           <div className="w-full max-w-5xl border border-2 border-black rounded-lg mt-8">
-            <div className="text-3xl text-center">
-            Found <strong>{paths.length}</strong> path(s) with <strong>{degrees}</strong> degrees of separation in <strong>{executionTime}</strong> seconds using BFS Algorithm.
-            </div>
-            <div className="w-full h-full"></div>
+            <div className="text-3xl text-center text-[#1A535C]">
+            Found <strong>{paths.length} path(s)</strong> with{" "}
+            <strong>{degrees} degrees</strong> of separation from{" "}
+            <strong>{sourceInput}</strong> to{" "}
+            <strong>{destinationInput}</strong>
+            <strong>{executionTime} seconds</strong> using{" "}
+            <strong>{selectedAlgorithm} Algorithm.</strong>
+          </div>
+          <div className="w-full h-full max-w-5xl flex items-center justify-center border border-black bg-white">
+            <Graph data={dummyData} />
           </div>
         </div>
-      )}
+      )} */}
+      <div className="result flex flex-col items-center justify-center">
+        <div className="w-full max-w-5xl mt-8">
+          <div className="text-3xl text-center text-[#1A535C]">
+            Found <strong>{paths.length} path(s)</strong> with{" "}
+            <strong>{degrees} degrees</strong> of separation from{" "}
+            <strong>{sourceInput}</strong> to{" "}
+            <strong>{destinationInput}</strong> in{" "}
+            <strong>{executionTime} seconds</strong> using{" "}
+            <strong>{selectedAlgorithm} Algorithm.</strong>
+          </div>
+        </div>
+        <div className="mt-8 mb-10 w-full h-[600px] max-w-5xl flex items-center justify-center border border-[3px] border-[#1A535C] bg-white">
+          <Graph data={dummyData} />
+        </div>
+      </div>
     </div>
   );
 }
