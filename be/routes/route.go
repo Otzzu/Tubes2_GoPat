@@ -19,4 +19,5 @@ func Init(router *gin.Engine) {
 	search := router.Group("/search")
 	search.GET("/BFS", controllers.SearchBFS)
 	search.GET("/IDS", controllers.SearchIDS)
+	search.GET("/clear", controllers.ClearCached)
 }

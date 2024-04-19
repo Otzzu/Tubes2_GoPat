@@ -69,7 +69,7 @@ func lds(start string, goal string, maxDepth int) ([][]string, error) {
 		}
 
 		if currentDepth < maxDepth {
-			links, err := ScrapeWikipediaGoQuery(lastNode)
+			links, err := ScrapeWikipediaQuery(lastNode)
 			if err != nil {
 				return nil, err
 			}

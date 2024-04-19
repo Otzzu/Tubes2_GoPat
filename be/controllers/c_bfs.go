@@ -25,11 +25,12 @@ func SearchBFS(ctx *gin.Context) {
 		return
 	}
 
-	fullPathStart := "https://en.wikipedia.org/wiki/" + input.Start
-	fullPathGoal := "https://en.wikipedia.org/wiki/" + input.Goal
+	fullLinkStart := "https://en.wikipedia.org/wiki/" + input.Start
+	fullLinkGoal := "https://en.wikipedia.org/wiki/" + input.Goal
 
 	// paths, err := services.MainBFS(fullPathStart, fullPathGoal)
-	paths, err := services.BFS2(fullPathStart, fullPathGoal)
+	// paths, err := services.BFS3(fullPathStart, fullPathGoal)
+	paths, err := services.BreadthFirstSearch(fullLinkStart, fullLinkGoal)
 
 	if (err != nil) {
 		fmt.Println(err.Error())

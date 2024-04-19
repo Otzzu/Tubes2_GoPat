@@ -3,17 +3,19 @@ package services
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
+	// "sync"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 )
 
-var linkCache = make(map[string][]string)
+var LinkCache = make(map[string][]string)
 
-func ScrapeWikipediaGoQuery(url string) ([]string, error) {
+func ScrapeWikipediaQuery(url string) ([]string, error) {
 
-	if links, ok := linkCache[url]; ok {
+	if links, ok := LinkCache[url]; ok {
 		return links, nil
 	}
 
@@ -35,34 +37,42 @@ func ScrapeWikipediaGoQuery(url string) ([]string, error) {
 	}
 
 	var links []string
-	html.Find("a").Each(func(i int, s *goquery.Selection) {
-		link, exists := s.Attr("href")
-		if exists && strings.HasPrefix(link, "/wiki/") && !strings.Contains(link, ":") && !strings.Contains(link, "Main_Page") {
+	html.Find("a[href^='/wiki/']:not([href*=':']):not([href*='Main_Page'])").Each(func(i int, s *goquery.Selection) {
+		if link, exists := s.Attr("href"); exists {
 			fullLink := "https://en.wikipedia.org" + link
 			links = append(links, fullLink)
 		}
 	})
-	linkCache[url] = links
+	
+	LinkCache[url] = links
 
 	return links, nil
 }
 
 func ScrapeWikipediaColly(url string) ([]string, error) {
 
-	if links, ok := linkCache[url]; ok {
-		fmt.Println("USE CACHED")
+	if links, ok := LinkCache[url]; ok {
+		// fmt.Println("USE CACHED")
 		return links, nil
 	}
 
 	c := colly.NewCollector(
 		colly.AllowedDomains("wikipedia.org", "en.wikipedia.org"),
+		colly.Async(true),
 	)
+
+	c.Limit(&colly.LimitRule{DomainGlob: "*.wikipedia.org", Parallelism: 10})
+
+	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+
 
 	var links []string
 
+	var validWikiLink = regexp.MustCompile(`^/wiki/[^:]*$`)
+
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		if strings.HasPrefix(link, "/wiki/") && !strings.Contains(link, ":") && !strings.Contains(link, "Main_Page") {
+		if validWikiLink.MatchString(link) && !strings.Contains(link, "Main_Page") {
 			fullLink := "https://en.wikipedia.org" + link
 			links = append(links, fullLink)
 		}
@@ -81,6 +91,14 @@ func ScrapeWikipediaColly(url string) ([]string, error) {
 
 	c.Wait()
 
-	linkCache[url] = links
+	LinkCache[url] = links
 	return links, nil
+}
+
+func LinksToMap(links []string) map[string]bool {
+    linkMap := make(map[string]bool)
+    for _, link := range links {
+        linkMap[link] = true
+    }
+    return linkMap
 }
