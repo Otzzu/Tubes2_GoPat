@@ -25,7 +25,7 @@ export default function Navbar() {
             >
               Github
             </a>
-            <a href="./developers" className="hover:text-[#FF6B6B] hover:scale-110 focus:scale-110 duration-300 transition ease-in-out delay-50 ml-4">Developers</a>
+            <a href="./developers" className="hover:text-[#FF6B6B] hover:scale-110 focus:scale-110 duration-300 transition ease-in-out delay-50 ml-4">Dev</a>
           </div>
         </div>
       </div>
