@@ -3,26 +3,27 @@ package services
 import (
 	"container/list"
 	"fmt"
+	// "sync"
 )
 
 // func lds(start string, goal string, maxDepth int) ([]string, error) {
 // 	stack := list.New()
-// 	stack.PushBack([]string{start}) 
+// 	stack.PushBack([]string{start})
 
 // 	visited := make(map[string]bool)
 // 	visited[start] = true
 
 // 	for stack.Len() > 0 {
-// 		path := stack.Remove(stack.Back()).([]string) 
+// 		path := stack.Remove(stack.Back()).([]string)
 // 		lastNode := path[len(path)-1]
-// 		currentDepth := len(path) - 1 
+// 		currentDepth := len(path) - 1
 
 // 		if lastNode == goal {
 // 			return path, nil
 // 		}
 
 // 		if currentDepth < maxDepth {
-// 			links, err := ScrapeWikipediaGoQuery(lastNode) 
+// 			links, err := ScrapeWikipediaGoQuery(lastNode)
 // 			if err != nil {
 // 				return nil, err
 // 			}
@@ -102,6 +103,31 @@ func lds(start string, goal string, maxDepth int) ([][]string, error) {
 
 // 	return nil, fmt.Errorf("path not found in max depth %d", maxDepth)
 // }
+
+func asyncLDS(start, goal string, depth int) {
+	// var cache sync.Map
+	// var visited sync.Map
+	// var parent sync.Map
+	// var wg sync.WaitGroup
+	// var mu sync.Mutex
+
+	
+	// stack := []string{start}
+	// visited.Store(start, true)
+
+	// for len(stack) > 0 {
+	// 	front := stack[0]
+	// 	stack = stack[1:]
+	// 	go func(node string) {
+			
+	// 	}(front)
+
+	// 	back 
+	// }
+
+
+
+}
 
 func IDS(start string, goal string, maxDepth int, ) ([][]string, error){
     for i:= 0; i < maxDepth; i++ {

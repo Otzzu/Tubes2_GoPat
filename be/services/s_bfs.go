@@ -102,6 +102,7 @@ func BFS(start string, goal string, findAllPaths bool) ([][]string, error) {
 }
 
 func BFS2(start string, goal string) ([]string, error) {
+	LinkCache = make(map[string][]string)
 	queue := list.New()
 	queue.PushBack([]models.Node{{Name: start, IsBegin: true}})
 	queue.PushBack([]models.Node{{Name: goal, IsBegin: false}})
@@ -330,8 +331,8 @@ func processQueue(queue *list.List, visitedThis, visitedOther map[string]models.
 			if exist {
 				if validatePath(link, value.Path) {
 					return combinePaths(path, link, value.Path), nil
-				} 
-				
+				}
+
 			} else {
 				if _, exist2 := visitedThis[link]; !exist2 {
 					visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}

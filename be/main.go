@@ -3,12 +3,13 @@ package main
 import (
 	"be/routes"
 	"fmt"
-
+	"runtime"
 	"github.com/gin-gonic/gin"
 )
 
 
 func main(){
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	app := gin.Default()
 
 	routes.Init(app)

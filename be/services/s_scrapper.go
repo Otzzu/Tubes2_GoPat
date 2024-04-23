@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
 	// "sync"
 
 	"github.com/PuerkitoBio/goquery"
@@ -43,7 +44,7 @@ func ScrapeWikipediaQuery(url string) ([]string, error) {
 			links = append(links, fullLink)
 		}
 	})
-	
+
 	LinkCache[url] = links
 
 	return links, nil
@@ -51,10 +52,10 @@ func ScrapeWikipediaQuery(url string) ([]string, error) {
 
 func ScrapeWikipediaColly(url string) ([]string, error) {
 
-	if links, ok := LinkCache[url]; ok {
-		// fmt.Println("USE CACHED")
-		return links, nil
-	}
+	// if links, ok := LinkCache[url]; ok {
+	// 	// fmt.Println("USE CACHED")
+	// 	return links, nil
+	// }
 
 	c := colly.NewCollector(
 		colly.AllowedDomains("wikipedia.org", "en.wikipedia.org"),
@@ -64,7 +65,6 @@ func ScrapeWikipediaColly(url string) ([]string, error) {
 	c.Limit(&colly.LimitRule{DomainGlob: "*.wikipedia.org", Parallelism: 10})
 
 	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
-
 
 	var links []string
 
@@ -91,14 +91,14 @@ func ScrapeWikipediaColly(url string) ([]string, error) {
 
 	c.Wait()
 
-	LinkCache[url] = links
+	// LinkCache[url] = links
 	return links, nil
 }
 
 func LinksToMap(links []string) map[string]bool {
-    linkMap := make(map[string]bool)
-    for _, link := range links {
-        linkMap[link] = true
-    }
-    return linkMap
+	linkMap := make(map[string]bool)
+	for _, link := range links {
+		linkMap[link] = true
+	}
+	return linkMap
 }
