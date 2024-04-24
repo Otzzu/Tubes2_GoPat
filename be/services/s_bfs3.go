@@ -201,68 +201,7 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 
 }
 
-func cd(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *sync.WaitGroup) [][]string {
-	var mu sync.Mutex
-	var allPath [][]string
-	found := false
 
-	size := urls.Len()
-
-	fmt.Println("size: ", size)
-
-	for i := 0; i < size; i++ {
-		path := urls.Remove(urls.Front()).([]string)
-		last := path[len(path)-1]
-		sem <- struct{}{}
-		wg.Add(1)
-		go func(url string, goal string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			// fmt.Println(runtime.NumGoroutine())
-			if found {
-				return
-			}
-
-			res, _ := ScrapeWikipediaLinks(url)
-			for _, u := range res {
-				// fmt.Println(u)
-				// fmt.Println(goal, "goal")
-				if u == goal {
-					newPath := make([]string, len(path))
-					copy(newPath, path)
-					newPath = append(newPath, u)
-					mu.Lock()
-					allPath = append(allPath, newPath)
-					fmt.Println(allPath)
-					found = true
-					mu.Unlock()
-
-				} else {
-
-					if _, exist := visited.LoadOrStore(u, true); !exist {
-						newPath := make([]string, len(path))
-						copy(newPath, path)
-						newPath = append(newPath, u)
-						mu.Lock()
-						urls.PushBack(newPath)
-						mu.Unlock()
-					}
-				}
-
-			}
-		}(last, goal)
-	}
-
-	wg.Wait()
-
-	if len(allPath) > 0 {
-		fmt.Println(len(allPath))
-		return allPath
-	} else {
-		return nil
-	}
-
-}
 
 func AsyncBFS(start, goal string) [][]string {
 	var visited sync.Map
@@ -351,101 +290,7 @@ func AsyncBFS2(start, goal string) []string {
 	}
 }
 
-func AsyncBFS4(start, goal string) []string {
-	var parent sync.Map
-	var visited sync.Map
-	var mutex sync.Mutex
-	var wg sync.WaitGroup
 
-	sem := make(chan struct{}, maxConcurrency)
-
-	queue := []string{start}
-	visited.Store(start, true)
-
-	result := make(chan []string)
-
-	done := make(chan bool)
-
-	go func() {
-		for len(queue) > 0 {
-
-			local := make([]string, len(queue))
-			copy(local, queue)
-
-			// fmt.Println(len(queue))
-			// fmt.Println(len(local))
-			queue = make([]string, 0)
-			for _, url := range local {
-				// fmt.Println(url)
-				sem <- struct{}{}
-				wg.Add(1)
-				go func(url string) {
-					defer wg.Done()
-					defer func() { <-sem }()
-
-					select {
-					case <-result:
-						return
-					default:
-
-						res, _ := ScrapeWikipediaLinks(url)
-
-						for _, link := range res {
-							if link == goal {
-								resultPath := []string{url, goal}
-								found := false
-
-								fmt.Println("FOUND")
-								for !found {
-									before, _ := parent.Load(url)
-									resultPath = append([]string{before.(string)}, resultPath...)
-
-									if before == start {
-										found = true
-										result <- resultPath
-										done <- true
-									}
-								}
-							} else {
-								if _, exist := visited.LoadOrStore(link, true); !exist {
-									parent.Store(link, url)
-									select {
-									case <-result:
-										return
-									default:
-										mutex.Lock()
-										queue = append(queue, link)
-										mutex.Unlock()
-									}
-
-								}
-							}
-						}
-					}
-				}(url)
-			}
-			wg.Wait()
-
-			select {
-			case <-result:
-				return
-			default:
-			}
-
-		}
-
-		done <- true
-
-	}()
-
-	select {
-	case resultPath := <-result:
-		return resultPath
-	case <-done:
-		return nil
-	}
-
-}
 
 func AsyncBFS3(start, goal string) []string {
 	var parent sync.Map
@@ -635,14 +480,16 @@ func AsyncBFS6(start, goal string) []string {
 		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		if found {
+			
+			return
+		}
 		href := e.Attr("href")
 		url := e.Request.URL.String()
 		if combinedRegex.MatchString(href) {
 			link := "https://en.wikipedia.org" + href
 			if !isExcluded(link) {
-				if found {
-					return
-				}
+				
 
 				if link == goal {
 					path := []string{goal}

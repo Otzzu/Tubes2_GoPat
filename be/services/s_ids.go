@@ -3,6 +3,9 @@ package services
 import (
 	"container/list"
 	"fmt"
+	"sync"
+
+	"github.com/gocolly/colly/v2"
 	// "sync"
 )
 
@@ -66,11 +69,11 @@ func lds(start string, goal string, maxDepth int) ([][]string, error) {
 		}
 
 		if foundDepth != -1 && currentDepth >= foundDepth {
-			continue 
+			continue
 		}
 
 		if currentDepth < maxDepth {
-			links, err := ScrapeWikipediaQuery(lastNode)
+			links, err := ScrapeWikipediaLinks(lastNode)
 			if err != nil {
 				return nil, err
 			}
@@ -97,45 +100,133 @@ func lds(start string, goal string, maxDepth int) ([][]string, error) {
 //     for i:= 0; i < maxDepth; i++ {
 //         path, err := lds(start, goal, i)
 //         if err == nil {
-//             return path, nil 
+//             return path, nil
 //         }
 //     }
 
 // 	return nil, fmt.Errorf("path not found in max depth %d", maxDepth)
 // }
 
-func asyncLDS(start, goal string, depth int) {
-	// var cache sync.Map
-	// var visited sync.Map
-	// var parent sync.Map
-	// var wg sync.WaitGroup
-	// var mu sync.Mutex
+type SearchState struct {
+	TargetURL string
+	Found     bool
+	FoundPath []string
+	Lock      sync.Mutex
+	LinkCache sync.Map // Cache for links found on each page using sync.Map
+}
 
+// visitPageWithResult starts from a URL and searches up to a given depth. It collects paths to the target.
+func visitPageWithResult(c *colly.Collector, url string, depth int, currentPath []string, state *SearchState) {
+	if depth <= 0 || state.Found {
+		return
+	}
 	
-	// stack := []string{start}
-	// visited.Store(start, true)
+	// Append the current URL to the path
+	newPath := append(currentPath, url)
 
-	// for len(stack) > 0 {
-	// 	front := stack[0]
-	// 	stack = stack[1:]
-	// 	go func(node string) {
-			
-	// 	}(front)
+	// Check if this URL is the target
+	if url == state.TargetURL {
+		state.Lock.Lock()
+		if !state.Found { // Ensure that the path is set only once
+			state.Found = true
+			state.FoundPath = newPath
+		}
+		state.Lock.Unlock()
+		return
+	}
+	
+	fmt.Println("DEPTH LOKAL :", depth)
+	// Check the cache first
+	if links, foundInCache := state.LinkCache.Load(url); foundInCache {
+		// Use cached links
+		fmt.Print("CA ")
+		for _, link := range links.([]string) {
+			if !contains(newPath, link) && !state.Found {
+				visitPageWithResult(c.Clone(), link, depth-1, newPath, state)
+			}
+		}
+	} else {
+		// If not found in cache, setup the collector to find and process links on the page
+		fg := 0
+		var discoveredLinks []string
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			fg++
+			fmt.Println(fg)
+			href := e.Attr("href")
+			if combinedRegex.MatchString(href) {
+				link := "https://en.wikipedia.org" + href
+				if !isExcluded(link) {
+					discoveredLinks = append(discoveredLinks, link)
+					if !state.Found {
+						// fmt.Print("Y ")
 
-	// 	back 
-	// }
+						visitPageWithResult(c.Clone(), link, depth-1, newPath, state)
+					}
+				}
+			}
 
+		})
 
+		c.Visit(url)
+
+		// Cache the discovered links
+		state.LinkCache.Store(url, discoveredLinks)
+	}
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, a := range slice {
+		if a == item {
+			return true
+		}
+	}
+	return false
+}
+
+func IDS2(start, goal string) []string {
+	c := colly.NewCollector(
+		colly.AllowedDomains("en.wikipedia.org"),
+	)
+
+	c.Limit(&colly.LimitRule{
+		Parallelism: maxConcurrency + 10,
+	})
+
+	state := &SearchState{
+		TargetURL: goal,
+	}
+
+	depth := 1
+	for {
+		fmt.Println("DEPTH GEDE :", depth)
+		visitPageWithResult(c, start, depth, []string{}, state)
+		depth++
+
+		if state.Found {
+			fmt.Println(state.FoundPath)
+			return state.FoundPath
+		} else {
+
+		}
+
+		if depth >= 10 {
+			fmt.Println("No Path found in depth >= 10")
+			break
+		}
+	}
+
+	return nil
 
 }
 
-func IDS(start string, goal string, maxDepth int, ) ([][]string, error){
-    for i:= 0; i < maxDepth; i++ {
-        path, err := lds(start, goal, i)
-        if err == nil {
-            return path, nil 
-        }
-    }
+func IDS(start string, goal string, maxDepth int) ([][]string, error) {
+	for i := 0; i < maxDepth; i++ {
+		path, err := lds(start, goal, i)
+		if err == nil {
+			return path, nil
+		}
+	}
 
 	return nil, fmt.Errorf("path not found in max depth %d", maxDepth)
 }

@@ -28,10 +28,11 @@ func SearchIDS(ctx *gin.Context) {
 	fullPathStart := "https://en.wikipedia.org/wiki/" + input.Start
 	fullPathGoal := "https://en.wikipedia.org/wiki/" + input.Goal
 
-	paths, err := services.IDS(fullPathStart, fullPathGoal, 5)
+	// paths, err := services.IDS(fullPathStart, fullPathGoal, 5)
+	paths := services.IDS2(fullPathStart, fullPathGoal)
 
-	if (err != nil) {
-		fmt.Println(err.Error())
+	if (paths == nil) {
+		// fmt.Println(err.Error())
 
 		ctx.JSON(http.StatusNotFound, gin.H{"found": false, "message": "path not found"})
 

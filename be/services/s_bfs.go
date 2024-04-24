@@ -4,17 +4,8 @@ import (
 	"be/models"
 	"container/list"
 	"fmt"
-	"sync"
 )
 
-type SearchState struct {
-	Queue   *list.List
-	Visited map[string]bool
-	Paths   [][]string
-	Found   bool
-	Depth   int
-	Lock    sync.Mutex
-}
 
 // func BFS(start string, goal string) ([]string, error) {
 // 	queue := list.New()
