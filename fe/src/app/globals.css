@@ -23,6 +23,10 @@
     background: #555;
 }
 
+:root:has(.no-doc-scroll) {
+    overflow:hidden;
+  }
+  
 .rotate-animation {
   animation: rotate 0.5s linear;
 }

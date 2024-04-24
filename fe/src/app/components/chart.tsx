@@ -1,114 +1,225 @@
 import React, { useRef, useEffect } from "react";
 import * as d3 from "d3";
-import {
-  BaseType,
-  Selection,
-  SimulationNodeDatum,
-  SimulationLinkDatum,
-} from "d3";
+import { SimulationNodeDatum, SimulationLinkDatum } from "d3";
 
 // Define TypeScript types for your data
-interface Node extends SimulationNodeDatum {
+export interface Node extends SimulationNodeDatum {
   id: string;
   group: number;
 }
 
-interface Link extends SimulationLinkDatum<Node> {
-  source: string | Node; // Can be a string ID or a Node object
-  target: string | Node; // Can be a string ID or a Node object
+export interface Link extends SimulationLinkDatum<Node> {
+  source: string | Node;
+  target: string | Node;
 }
 
-interface GraphData {
+export interface GraphData {
   nodes: Node[];
   links: Link[];
 }
 
+const color = d3.scaleOrdinal(d3.schemeCategory10);
+const createLegendData = (graphData: GraphData) => {
+  return graphData.nodes.map((node, index) => {
+    let text;
+    if (index === 0) {
+      text = "Start page";
+    } else if (index === graphData.nodes.length - 1) {
+      text = "End page";
+    } else {
+      text = `${index} degree${index > 1 ? "s" : ""} away`;
+    }
+    return {
+      color: color(node.group.toString()),
+      text: text,
+      group: node.group,
+    };
+  });
+};
+
+export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
+  const nodes: Node[] = [];
+  const links: Link[] = [];
+  const nodeNameSet = new Set<string>();
+
+  pathsArray.forEach((path) => {
+    for (let i = 0; i < path.length; i++) {
+      const name = path[i].split("/").pop()!.replace(/_/g, " ");
+      if (!nodeNameSet.has(name)) {
+        nodeNameSet.add(name);
+        nodes.push({ id: name, group: i });
+      }
+      if (i > 0) {
+        const sourceName = path[i - 1].split("/").pop()!.replace(/_/g, " ");
+        links.push({
+          source: sourceName,
+          target: name,
+        });
+      }
+    }
+  });
+
+  return { nodes, links };
+};
+
 const Graph: React.FC<{ data: GraphData }> = ({ data }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const gRef = useRef<SVGGElement>(null);
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove();
+    const width = svgRef.current.clientWidth;
+    const height = svgRef.current.clientHeight;
 
-    // Helper function to correctly type the node.id for d3.forceLink
-    const linkForceId = (d: Node | d3.SimulationNodeDatum) => {
-      if ((d as Node).id) {
-        return (d as Node).id;
-      }
-      throw new Error("Node id not found");
-    };
+    const svg = d3.select(svgRef.current);
+    const g = d3.select(gRef.current);
+
+    g.selectAll("*").remove();
+
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.5, 8])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+
+    svg.call(zoom);
 
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
     const simulation = d3
       .forceSimulation(data.nodes)
-      .force("link", d3.forceLink(data.links).id(linkForceId))
-      .force("charge", d3.forceManyBody())
       .force(
-        "center",
-        d3.forceCenter(
-          svgRef.current.clientWidth / 2,
-          svgRef.current.clientHeight / 2
-        )
-      );
+        "link",
+        d3
+          .forceLink(data.links)
+          .id((d) => (d as Node).id)
+          .distance(100)
+      ) // Increase distance between nodes
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const link = svg
+    const legendData = createLegendData(data);
+
+    const legend = svg
+      .append("g")
+      .attr("class", "legend")
+      .attr("transform", "translate(10,10)")
+      .selectAll("g")
+      .data(legendData)
+      .enter()
+      .append("g")
+      .attr("class", "legend")
+      .attr("transform", (d, i) => `translate(0, ${i * 20})`); 
+
+    // Draw legend colored rectangles
+    legend
+      .append("circle")
+      .attr("cx", 10)
+      .attr("cy", 9)
+      .attr("r", 5)
+      .style("fill", (d) => d.color);
+
+    // Draw legend text
+    legend
+      .append("text")
+      .attr("x", 25)
+      .attr("y", 9)
+      .attr("dy", ".35em") 
+      .text((d) => d.text)
+      .style("font-family", "Poppins")
+      .style("font-size", 15);
+
+    const link = g
       .append("g")
       .attr("stroke", "#999")
       .selectAll("line")
       .data(data.links)
-      .join("line");
+      .join("line")
+      .attr("stroke-width", 2);
 
-    const node = svg
+    const node = g
       .append("g")
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5)
       .selectAll<SVGCircleElement, Node>("circle")
       .data(data.nodes)
       .join("circle")
-      .attr("r", (d, i) => (i === 0 || i === data.nodes.length - 1 ? 15 : 8))
-      .attr("fill", (d) => (d.group === 1 ? "red" : "blue"));
+      .attr("r", (d, i) => (i === 0 || i === data.nodes.length - 1 ? 20 : 15))
+      .attr("fill", (d) => color(d.group.toString()));
 
-    // We need to properly type the drag behavior
-    const dragBehavior: any = d3
-      .drag()
-      .on("start", (event: any) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      })
-      .on("drag", (event: any) => {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-      })
-      .on("end", (event: any) => {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-      });
+    const labels = g
+      .append("g")
+      .selectAll("text")
+      .data(data.nodes)
+      .join("text")
+      .text((d) => d.id)
+      .attr("x", (d) => d.x ?? 0)
+      .attr("y", (d) => d.y ?? 0)
+      .style("fill", "#075A5A")
+      .style("font-family", "Poppins")
+      .style("font-size", 15)
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("dx", "4em");
 
-    node.call(dragBehavior as any);
+    node.call(
+      d3
+        .drag<SVGCircleElement, Node>()
+        .on("start", (event) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          event.subject.fx = event.subject.x;
+          event.subject.fy = event.subject.y;
+        })
+        .on("drag", (event) => {
+          event.subject.fx = event.x;
+          event.subject.fy = event.y;
+        })
+        .on("end", (event) => {
+          if (!event.active) simulation.alphaTarget(0);
+          event.subject.fx = null;
+          event.subject.fy = null;
+        })
+    );
 
     simulation.on("tick", () => {
       link
-        .attr("x1", (d) => (d.source as Node).x ?? 0)
-        .attr("y1", (d) => (d.source as Node).y ?? 0)
-        .attr("x2", (d) => (d.target as Node).x ?? 0)
-        .attr("y2", (d) => (d.target as Node).y ?? 0);
+        .attr("x1", (d) => (d.source as Node).x ?? width / 2)
+        .attr("y1", (d) => (d.source as Node).y ?? height / 2)
+        .attr("x2", (d) => (d.target as Node).x ?? width / 2)
+        .attr("y2", (d) => (d.target as Node).y ?? height / 2);
 
-      node.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0);
+      node
+        .attr("cx", (d) => d.x ?? width / 2)
+        .attr("cy", (d) => d.y ?? height / 2);
+
+      labels
+        .attr("x", (d) => d.x ?? width / 2)
+        .attr("y", (d) => d.y ?? height / 2);
     });
+
+    window.addEventListener("resize", resize);
+    function resize() {
+      const newWidth = svgRef.current!.clientWidth;
+      const newHeight = svgRef.current!.clientHeight;
+
+      simulation.force("center", d3.forceCenter(newWidth / 2, newHeight / 2));
+      simulation.alpha(0.3).restart();
+    }
+    return () => {
+      window.removeEventListener("resize", resize);
+    };
   }, [data]);
 
   return (
     <svg
       ref={svgRef}
-      viewBox="0 0 1200 600"
       preserveAspectRatio="xMidYMid meet"
-      style={{ width: "100%", height: "100%" }} // Ensures the SVG is responsive
-    />
+      style={{ width: "100%", height: "100%" }}
+    >
+      <g ref={gRef}></g>
+    </svg>
   );
 };
 
