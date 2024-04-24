@@ -14,7 +14,7 @@ export function TabsDemo({ onAlgorithmChange } : TabsDemoProps) {
     };
   
     return (
-      <Tabs defaultValue="account" className="w-[300px] sm:w-[705px]">
+      <Tabs defaultValue="account" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="account" className="text-[#A1B6BA] text-3xl font-semibold" onClick={() => handleTabClick('BFS')}>BFS</TabsTrigger>
           <TabsTrigger value="password" className="text-[#A1B6BA] text-3xl font-semibold" onClick={() => handleTabClick('IDS')}>IDS</TabsTrigger>
