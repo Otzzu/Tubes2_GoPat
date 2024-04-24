@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	// "runtime"
 	"sync"
@@ -20,13 +21,17 @@ var (
 
 	excludedNamespaces2 = []string{
 		"Category:", "Wikipedia:", "File:", "Help:", "Portal:",
-		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:", "Main_Page",
+		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
 	}
 	maxConcurrency = 20
 	cache          sync.Map
 )
 
 func isExcluded(link string) bool {
+	if link == "https://en.wikipedia.org/wiki/Main_Page" {
+		return false
+	}
+
 	for _, ns := range excludedNamespaces2 {
 		if regexp.MustCompile(`^` + regexp.QuoteMeta(ns)).MatchString(link) {
 			return true
@@ -96,7 +101,7 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 	// 	return val.([]string), nil
 	// }
 
-	result := make([]string, 0, 50)
+	result := make([]string, 0)
 
 	c := colly.NewCollector(
 		colly.AllowedDomains("wikipedia.org", "en.wikipedia.org"),
@@ -143,7 +148,7 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 	return result, nil
 }
 
-func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *sync.WaitGroup) [][]string {
+func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *sync.WaitGroup, count *uint32) [][]string {
 	var mu sync.Mutex
 	var allPath [][]string
 
@@ -162,6 +167,7 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 			// fmt.Println(runtime.NumGoroutine())
 
 			res, _ := ScrapeWikipediaLinks(url)
+			atomic.AddUint32(count, 1)
 			for _, u := range res {
 				// fmt.Println(u)
 				// fmt.Println(goal, "goal")
@@ -203,10 +209,12 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 
 
 
-func AsyncBFS(start, goal string) [][]string {
+func AsyncBFSMulti(start, goal string) ([][]string, int) {
 	var visited sync.Map
 	semp := make(chan struct{}, maxConcurrency)
 	var wg sync.WaitGroup
+	var countChecked uint32 = 1
+
 
 	queue := list.New()
 	queue.PushBack([]string{start})
@@ -216,13 +224,13 @@ func AsyncBFS(start, goal string) [][]string {
 	for queue.Len() > 0 {
 		i++
 		fmt.Println("DEPTH: ", i)
-		r := b(queue, goal, &visited, semp, &wg)
+		r := b(queue, goal, &visited, semp, &wg, &countChecked)
 		if r != nil {
-			return r
+			return r, int(countChecked)
 		}
 	}
 
-	return nil
+	return nil, int(countChecked)
 
 }
 
@@ -451,15 +459,17 @@ func AsyncBFS5(start, goal string) []string {
 	return nil
 }
 
-func AsyncBFS6(start, goal string) []string {
+func AsyncBFS6(start, goal string) ([]string, int) {
 	var parent sync.Map
 	var visited sync.Map
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
+	var countChecked uint32 = 1
 
 	// sem := make(chan struct{}, maxConcurrency)
 	queue := []string{start}
 	visited.Store(start, true)
+
 
 	var resultPath []string
 	var found bool
@@ -550,6 +560,7 @@ func AsyncBFS6(start, goal string) []string {
 
 					mutex.Unlock()
 					c.Visit(url)
+					atomic.AddUint32(&countChecked, 1)
 				}
 			}()
 		}
@@ -562,7 +573,7 @@ func AsyncBFS6(start, goal string) []string {
 	}
 
 	if len(resultPath) > 0 {
-		return resultPath
+		return resultPath, int(countChecked)
 	}
-	return nil
+	return nil, int(countChecked)
 }

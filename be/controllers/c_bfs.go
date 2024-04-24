@@ -31,18 +31,18 @@ func SearchBFS(ctx *gin.Context) {
 	// paths, err := services.MainBFS(fullPathStart, fullPathGoal)
 	// paths, _ := services.BFS2(fullLinkStart, fullLinkGoal)
 	start := time.Now()
-	paths := services.AsyncBFS6(input.Start, input.Goal)
+	paths, countChecked := services.AsyncBFS6(input.Start, input.Goal)
 	duration := time.Since(start).Milliseconds()
 
 	if (paths == nil) {
 		// fmt.Println(err.Error())
 
-		ctx.JSON(http.StatusNotFound, gin.H{"found": false, "message": "path not found"})
+		ctx.JSON(http.StatusNotFound, gin.H{"found": false, "message": "path not found", "executionTime" : duration})
 
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"paths": [][]string{paths} ,"found": true, "message": "path found", "executionTime" : duration})
+	ctx.JSON(http.StatusOK, gin.H{"paths": [][]string{paths} ,"found": true, "message": "path found", "executionTime" : duration, "countChecked": countChecked})
 	// return
 
 }
