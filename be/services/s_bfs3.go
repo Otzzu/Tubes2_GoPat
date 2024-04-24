@@ -23,7 +23,7 @@ var (
 		"Category:", "Wikipedia:", "File:", "Help:", "Portal:",
 		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
 	}
-	maxConcurrency = 20
+	maxConcurrency = 40
 	cache          sync.Map
 )
 
@@ -109,7 +109,7 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 
 	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
 
-	c.SetRequestTimeout(30 * time.Second)
+	c.SetRequestTimeout(15 * time.Second)
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
@@ -154,7 +154,7 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 
 	size := urls.Len()
 
-	fmt.Println("size: ", size)
+	// fmt.Println("size: ", size)
 
 	for i := 0; i < size; i++ {
 		path := urls.Remove(urls.Front()).([]string)
@@ -300,11 +300,12 @@ func AsyncBFS2(start, goal string) []string {
 
 
 
-func AsyncBFS3(start, goal string) []string {
+func AsyncBFS3(start, goal string) ([]string, int) {
 	var parent sync.Map
 	var visited sync.Map
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
+	var count uint32
 
 	sem := make(chan struct{}, maxConcurrency)
 	queue := []string{start}
@@ -330,6 +331,7 @@ func AsyncBFS3(start, goal string) []string {
 				}
 
 				res, _ := ScrapeWikipediaLinks(url)
+				atomic.AddUint32(&count, 1)
 				for _, link := range res {
 					if found {
 						return
@@ -371,17 +373,18 @@ func AsyncBFS3(start, goal string) []string {
 	}
 
 	if found {
-		return resultPath
+		return resultPath, int(count)
 	}
-	return nil
+	return nil, int(count)
 
 }
 
-func AsyncBFS5(start, goal string) []string {
+func AsyncBFS5(start, goal string) ([]string, int) {
 	var parent sync.Map
 	var visited sync.Map
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
+	var countChecked uint32
 
 	var resultPath []string
 	var found bool
@@ -394,7 +397,7 @@ func AsyncBFS5(start, goal string) []string {
 		queue = []string{}
 
 		batchsize := (len(local) / maxConcurrency) + 1
-		fmt.Println(batchsize)
+		// fmt.Println(batchsize)
 
 		for i := 0; i < len(local); i += batchsize {
 			end := i + batchsize
@@ -408,6 +411,7 @@ func AsyncBFS5(start, goal string) []string {
 
 				for _, url := range links {
 					res, _ := ScrapeWikipediaLinks(url)
+					atomic.AddUint32(&countChecked, 1)
 					for _, link := range res {
 						if found {
 							return
@@ -453,10 +457,10 @@ func AsyncBFS5(start, goal string) []string {
 	}
 
 	if found {
-		return resultPath
+		return resultPath, int(countChecked)
 	}
 
-	return nil
+	return nil, int(countChecked)
 }
 
 func AsyncBFS6(start, goal string) ([]string, int) {
@@ -480,7 +484,7 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 
 	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
 
-	c.SetRequestTimeout(30 * time.Second)
+	c.SetRequestTimeout(15 * time.Second)
 
 	c.Limit(&colly.LimitRule{
 		Parallelism: maxConcurrency + 5,

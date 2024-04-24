@@ -42,7 +42,12 @@ func SearchIDS(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"paths": paths ,"found": true, "countChecked" : countChecked, "message": "path found", "executionTime" : duration})
+	newPath := make([]string, 0, len(paths))
+	for _, path := range paths {
+		newPath = append(newPath, services.DecodePercentEncodedString(path))
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"paths": [][]string{newPath} ,"found": true, "countChecked" : countChecked, "message": "path found", "executionTime" : duration})
 	return
 
 }

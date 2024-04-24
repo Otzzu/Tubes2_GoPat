@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -18,6 +19,14 @@ var (
 	excludedNamespaces = []string{"Category:", "Wikipedia:", "File:", "Help:", "Portal:", "Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:", "Main_Page"}
 	wikiArticleRegex   = regexp.MustCompile(`^/wiki/([^#:\s]+)$`)
 )
+
+func DecodePercentEncodedString(encodedString string) (string) {
+    decodedString, err := url.QueryUnescape(encodedString)
+    if err != nil {
+        return encodedString // return the error if the decoding fails
+    }
+    return decodedString
+}
 
 // BiDirectionalBFS finds all shortest paths between start and goal using bidirectional BFS.
 func BfsTes(start, goal string) ([][]string, error) {
