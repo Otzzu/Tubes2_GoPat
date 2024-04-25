@@ -116,7 +116,7 @@ export default function Search() {
     setisLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:4000/search/BFS`, {
+      const response = await fetch(`http://localhost:8080/search/BFS3`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

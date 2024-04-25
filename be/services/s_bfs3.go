@@ -2,7 +2,6 @@ package services
 
 import (
 	"container/list"
-	"context"
 	"fmt"
 	"sync/atomic"
 
@@ -97,9 +96,12 @@ func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, err
 }
 
 func ScrapeWikipediaLinks(url string) ([]string, error) {
-	// if val, exist := cache.Load(url); exist {
-	// 	return val.([]string), nil
-	// }
+	if val, exist := cache.Load(url); exist {
+		if len(val.([]string)) > 0 {
+
+			return val.([]string), nil
+		}
+	}
 
 	result := make([]string, 0)
 
@@ -110,6 +112,10 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
 
 	c.SetRequestTimeout(15 * time.Second)
+
+	c.Limit(&colly.LimitRule{
+		Parallelism: 1,
+	})
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
@@ -123,7 +129,7 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 	})
 
 	var attempt int
-	maxAttempts := 2
+	maxAttempts := 1
 	c.OnError(func(r *colly.Response, err error) {
 		if r.StatusCode == 0 { // Network error, possibly a timeout
 			attempt++
@@ -143,7 +149,10 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 
 	c.Visit(url)
 
-	// cache.Store(url, result)
+	if (len(result) > 0){
+
+		cache.Store(url, result)
+	}
 
 	return result, nil
 }
@@ -234,71 +243,72 @@ func AsyncBFSMulti(start, goal string) ([][]string, int) {
 
 }
 
-func AsyncBFS2(start, goal string) []string {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func reconstructPath(start, goal string, parent *sync.Map) []string {
+    var path []string
+    for at := goal; at != start; {
+        path = append([]string{at}, path...)
+        p, _ := parent.Load(at)
+        at = p.(string)
+    }
+	path = append([]string{start}, path...)
 
-	var visited sync.Map
-	queue := make(chan []string, 20)
-	found := make(chan []string)
-	var wg sync.WaitGroup
-
-	// Start multiple worker goroutines
-	numWorkers := 10 // You can set this according to your CPU cores or specific needs
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for path := range queue {
-				fmt.Println(path)
-				currentURL := path[len(path)-1]
-				if currentURL == goal {
-					select {
-					case found <- path:
-						cancel() // Cancel all workers
-						return
-					case <-ctx.Done():
-						return
-					}
-				}
-				res, err := ScrapeWikipediaLinks(currentURL)
-				if err != nil {
-					fmt.Println("Error scraping:", err)
-					continue
-				}
-				for _, u := range res {
-					if _, loaded := visited.LoadOrStore(u, true); !loaded {
-						newPath := append([]string(nil), append(path, u)...)
-						select {
-						case queue <- newPath:
-						case <-ctx.Done():
-							return
-						}
-					}
-				}
-			}
-		}()
-	}
-
-	// Seed the initial URL
-	queue <- []string{start}
-	visited.Store(start, true)
-
-	// Wait for workers to finish
-	go func() {
-		wg.Wait()
-		close(queue)
-	}()
-
-	select {
-	case res := <-found:
-		return res
-	case <-ctx.Done():
-		return nil
-	}
+    return path
 }
 
+func AsyncBFS7(start, goal string) ([]string, int) {
+    visited := &sync.Map{}
+    parent := &sync.Map{}
+    queue := []string{start}
+    visited.Store(start, true)
 
+    var wg sync.WaitGroup
+    var mutex sync.Mutex
+    var found uint32
+    var count int32
+
+    for len(queue) > 0 && atomic.LoadUint32(&found) == 0 {
+        currentBatch := make([]string, len(queue))
+        copy(currentBatch, queue)
+        queue = []string{}
+
+        for _, url := range currentBatch {
+            wg.Add(1)
+            go func(url string) {
+                defer wg.Done()
+                if atomic.LoadUint32(&found) == 1 {
+                    return
+                }
+                links, err := ScrapeWikipediaLinks(url)
+                if err != nil {
+                    fmt.Println("Error scraping:", err)
+                    return
+                }
+                atomic.AddInt32(&count, 1)
+
+                for _, link := range links {
+                    if link == goal {
+                        atomic.StoreUint32(&found, 1)
+                        parent.Store(goal, url)
+                        return
+                    }
+
+                    if _, loaded := visited.LoadOrStore(link, true); !loaded {
+                        parent.Store(link, url)
+                        mutex.Lock()
+                        queue = append(queue, link)
+                        mutex.Unlock()
+                    }
+                }
+            }(url)
+        }
+        wg.Wait()
+    }
+
+    if atomic.LoadUint32(&found) == 1 {
+        return reconstructPath(start, goal, parent), int(count)
+    }
+    return nil, int(count)
+}
 
 func AsyncBFS3(start, goal string) ([]string, int) {
 	var parent sync.Map
@@ -315,8 +325,7 @@ func AsyncBFS3(start, goal string) ([]string, int) {
 	var found bool
 
 	for len(queue) > 0 {
-		local := make([]string, len(queue))
-		copy(local, queue)
+		local := queue
 		queue = []string{}
 
 		for _, url := range local {
@@ -338,6 +347,7 @@ func AsyncBFS3(start, goal string) ([]string, int) {
 					}
 
 					if link == goal {
+						
 						path := []string{goal}
 						for at := url; at != start; {
 							path = append([]string{at}, path...)
@@ -358,13 +368,13 @@ func AsyncBFS3(start, goal string) ([]string, int) {
 
 					if _, exist := visited.LoadOrStore(link, true); !exist {
 						parent.Store(link, url)
-						mutex.Lock()
 						if !found {
+							mutex.Lock()
 							queue = append(queue, link)
+							mutex.Unlock()
 						} else {
 							return
 						}
-						mutex.Unlock()
 					}
 				}
 			}(url)
@@ -487,7 +497,7 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 	c.SetRequestTimeout(15 * time.Second)
 
 	c.Limit(&colly.LimitRule{
-		Parallelism: maxConcurrency + 5,
+		Parallelism: 1,
 	})
 
 	c.OnError(func(r *colly.Response, err error) {

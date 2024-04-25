@@ -14,7 +14,7 @@ func main(){
 
 	routes.Init(app)
 
-	var port string = "3000"
+	var port string = "8080"
 
 	fmt.Println("Hello World!")
 	fmt.Println("Server running on port " + port)

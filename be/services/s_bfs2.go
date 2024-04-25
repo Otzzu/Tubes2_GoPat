@@ -28,78 +28,7 @@ func DecodePercentEncodedString(encodedString string) (string) {
     return decodedString
 }
 
-// BiDirectionalBFS finds all shortest paths between start and goal using bidirectional BFS.
-func BfsTes(start, goal string) ([][]string, error) {
-	if start == goal {
-		return [][]string{{start}}, nil
-	}
 
-	// Initialize structures for BFS from both directions
-	fromStart := make(map[string][][]string)
-	fromGoal := make(map[string][][]string)
-	visitedFromStart := make(map[string]bool)
-	visitedFromGoal := make(map[string]bool)
-	queueFromStart := list.New()
-	queueFromGoal := list.New()
-	queueFromStart.PushBack(start) // Initialize the start queue with the start node
-	queueFromGoal.PushBack(goal)
-
-	fromStart[start] = [][]string{{start}}
-	fromGoal[goal] = [][]string{{goal}}
-	visitedFromStart[start] = true
-	visitedFromGoal[goal] = true
-
-	// Search until both queues are empty
-	for queueFromStart.Len() > 0 || queueFromGoal.Len() > 0 {
-		if queueFromStart.Len() > 0 {
-			current := queueFromStart.Remove(queueFromStart.Front()).(string)
-			err := bfsStep(current, queueFromStart, visitedFromStart, fromStart)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if queueFromGoal.Len() > 0 {
-			current := queueFromGoal.Remove(queueFromGoal.Front()).(string)
-			err := bfsStep(current, queueFromGoal, visitedFromGoal, fromGoal)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Check for intersections
-		for node := range visitedFromStart {
-			if visitedFromGoal[node] {
-				// Combine paths through the intersection node
-				var combinedPaths [][]string
-				fmt.Println("START ", fromStart[node])
-				fmt.Println("GOAL ", fromGoal[node])
-				for _, path1 := range fromStart[node] {
-					for _, path2 := range fromGoal[node] {
-						// Reverse the path from the goal to the meeting point to make it go from meeting point to goal
-						reversedPath2 := make([]string, len(path2))
-						for i, v := range path2 {
-							reversedPath2[len(path2)-1-i] = v
-						}
-
-						if checkPath(reversedPath2) {
-
-							// Avoid repeating the intersection node and combine the paths
-							fullPath := make([]string, len(path1)+len(reversedPath2)-1)
-							copy(fullPath, path1)
-							copy(fullPath[len(path1):], reversedPath2[1:]) // Skip the meeting point in reversedPath2
-
-							combinedPaths = append(combinedPaths, fullPath)
-						}
-					}
-				}
-				return combinedPaths, nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("Path not found")
-}
 
 func checkPath(path []string) bool {
 
@@ -172,53 +101,7 @@ func getPaths(pages []string, visited map[string][]string) [][]string {
 	return paths
 }
 
-// BreadthFirstSearch performs a bi-directional BFS and returns all shortest paths between the source and target URLs.
-func BreadthFirstSearch(sourcePageURL, targetPageURL string) ([][]string, error) {
-	if sourcePageURL == targetPageURL {
-		return [][]string{{sourcePageURL}}, nil
-	}
 
-	visitedForward := make(map[string][]string)
-	unvisitedForward := map[string][]string{sourcePageURL: {""}}
-	var paths [][]string
-
-	for {
-		outgoingLinks, err := fetchOutgoingLinks(unvisitedForward)
-		// fmt.Println(outgoingLinks)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching forward links: %v", err)
-		}
-		for source := range unvisitedForward {
-			copy(visitedForward[source], unvisitedForward[source])
-		}
-
-		for k := range unvisitedForward {
-			delete(unvisitedForward, k)
-		}
-
-		for sourceURL, targetURLs := range outgoingLinks {
-			for _, targetURL := range targetURLs {
-				_, found1 := visitedForward[targetURL]
-				_, found2 := unvisitedForward[targetURL]
-
-				if !found1 && !found2 {
-					unvisitedForward[targetURL] = []string{sourceURL}
-				} else if found2 {
-					unvisitedForward[targetURL] = append(unvisitedForward[targetURL], sourceURL)
-				}
-			}
-		}
-
-		fmt.Println("foward", unvisitedForward)
-		fmt.Println("foward", visitedForward)
-
-	}
-
-	if len(paths) == 0 {
-		return nil, errors.New("no path found")
-	}
-	return paths, nil
-}
 
 // fetchOutgoingLinks fetches outgoing links from given Wikipedia page URLs.
 // It extracts links from specific elements in parallel.

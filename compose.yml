@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: 
+      context: ./fe
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    develop:
+      watch:
+        - path: ./fe/package.json
+          action: rebuild
+        - path: ./fe/next.config.mjs
+          action: rebuild
+        - path: ./fe/package-lock.json
+          action: rebuild
+        - path: ./fe/tailwind.config.ts
+          action: rebuild
+        - path: ./fe
+          target: /app
+          action: sync
+
+  backend:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080  # Expose the port that your Gin application runs on
+    volumes:
+      - ./be:/app  # Sync local changes to the container
+    environment:
+      - GIN_MODE=release  # Set Gin to run in release mode
+
+
+
+volumes:
+  tes: 

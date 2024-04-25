@@ -7,38 +7,7 @@ import (
 )
 
 
-// func BFS(start string, goal string) ([]string, error) {
-// 	queue := list.New()
-// 	queue.PushBack([]string{start})
 
-// 	visited := make(map[string]bool)
-// 	visited[start] = true
-
-// 	for queue.Len() > 0 {
-// 		path := queue.Remove(queue.Front()).([]string)
-// 		lastNode := path[len(path)-1]
-
-// 		if lastNode == goal {
-// 			return path, nil
-// 		}
-
-// 		links, err := ScrapeWikipediaGoQuery(lastNode)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-
-// 		for _, link := range links {
-// 			if !visited[link] {
-// 				visited[link] = true
-// 				newPath := make([]string, len(path))
-// 				copy(newPath, path)
-// 				newPath = append(newPath, link)
-// 				queue.PushBack(newPath)
-// 			}
-// 		}
-// 	}
-// 	return nil, fmt.Errorf("path not found")
-// }
 
 func BFS(start string, goal string, findAllPaths bool) ([][]string, error) {
 	queue := list.New()
