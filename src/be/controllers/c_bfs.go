@@ -5,6 +5,7 @@ import (
 	"be/services"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -85,31 +86,50 @@ func SearchBFSMulti(ctx *gin.Context) {
 		return
 	}
 
-	newPaths := make([][]string, 0, len(paths))
+	// newPaths := make([][]string, 0, len(paths))
+
+	// for _, nPath := range paths {
+
+	// 	newPath := make([]string, 0, len(nPath))
+	// 	for _, path := range nPath {
+	// 		newPath = append(newPath, services.DecodePercentEncodedString(path))
+	// 	}
+
+	// 	same := false
+	// 	for _, p := range newPaths {
+	// 		if services.CompareArrays(p, newPath) {
+	// 			same = true
+	// 			break
+	// 		}
+	// 	}
+
+	// 	if !same {
+
+	// 		newPaths = append(newPaths, newPath)
+	// 	}
+	// }
+
+	uniquePaths := make(map[string]struct{}) // Using a map as a set
+	newPaths := make([][]string, 0)
 
 	for _, nPath := range paths {
-
 		newPath := make([]string, 0, len(nPath))
 		for _, path := range nPath {
-			newPath = append(newPath, services.DecodePercentEncodedString(path))
+			decodedPath := services.DecodePercentEncodedString(path)
+			newPath = append(newPath, decodedPath)
 		}
 
-		same := false
-		for _, p := range newPaths {
-			if services.CompareArrays(p, newPath) {
-				same = true
-				return
-			}
-		}
-
-		if !same {
-
+		// Create a string key to use in the map for uniqueness check
+		pathKey := strings.Join(newPath, ",") // Join paths as a single string with commas
+		if _, exists := uniquePaths[pathKey]; !exists {
+			uniquePaths[pathKey] = struct{}{}
 			newPaths = append(newPaths, newPath)
 		}
 	}
 
+	// fmt.Println(newPaths)
+
 	ctx.JSON(http.StatusOK, gin.H{"paths": newPaths, "found": true, "message": "path found", "executionTime": duration, "countChecked": countChecked})
-	// return
 
 }
 
@@ -151,7 +171,6 @@ func SearchBFS2(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"paths": [][]string{newPath}, "found": true, "message": "path found", "executionTime": duration, "countChecked": countChecked})
-	// return
 
 }
 

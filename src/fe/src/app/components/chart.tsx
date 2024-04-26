@@ -49,11 +49,11 @@ export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
   pathsArray.forEach((path) => {
     for (let i = 0; i < path.length; i++) {
       const url = path[i];
-      console.log("ini url",url);
+      console.log("ini url", url);
       const name = url.split("/").pop()!.replace(/_/g, " ");
       if (!nodeNameSet.has(name)) {
         nodeNameSet.add(name);
-        nodes.push({ id: name, group: i ,url:url});
+        nodes.push({ id: name, group: i, url: url });
       }
       if (i > 0) {
         const sourceName = path[i - 1].split("/").pop()!.replace(/_/g, " ");
@@ -130,10 +130,11 @@ const Graph: React.FC<{ data: GraphData; len: number }> = ({ data, len }) => {
       .attr("cx", 10)
       .attr("cy", 9)
       .attr("r", 8)
-      .attr("stroke", (d, i) => i === 0 || i === data.nodes.length - 1 ? "#1A535C" : "rgb(125, 62, 7)")
+      .attr("stroke", (d) =>
+        d.group === 0 || d.group === len - 1 ? "#1A535C" : "rgb(125, 62, 7)"
+      )
       .attr("stroke-width", 2)
       .style("fill", (d) => d.color);
-      
 
     // Draw legend text
     legend
@@ -145,26 +146,49 @@ const Graph: React.FC<{ data: GraphData; len: number }> = ({ data, len }) => {
       .style("font-family", "Poppins")
       .style("font-size", 15);
 
+    svg
+      .append("defs")
+      .selectAll("marker")
+      .data(["end"]) // Different link/path types can be defined here
+      .enter()
+      .append("marker")
+      .attr("id", String)
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 25) // Position of the arrowhead
+      .attr("refY", 0)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5");
+
     const link = g
       .append("g")
       .attr("stroke", "#999")
       .selectAll("line")
       .data(data.links)
       .join("line")
-      .attr("stroke-width", 2);
+      .attr("stroke-width", 2)
+      .attr("marker-end", "url(#end)");
 
     const node = g
       .append("g")
       .selectAll<SVGCircleElement, Node>("circle")
       .data(data.nodes)
       .join("circle")
-      .attr("r", (d, i) => (i === 0 || i === data.nodes.length - 1 ? 20 : 15))
+      .attr("r", (d) => {
+        if (d.group === 0) return 20;
+        if (d.group === len - 1) return 20;
+        return 15;
+      })
       .attr("fill", (d) => color(d.group.toString()))
-      .attr("stroke", (d, i) => i === 0 || i === data.nodes.length - 1 ? "#1A535C" : "rgb(125, 62, 7)")
+      .attr("stroke", (d) =>
+        d.group === 0 || d.group === len - 1 ? "#1A535C" : "rgb(125, 62, 7)"
+      )
       .attr("stroke-width", 3.5)
       .style("cursor", "pointer")
       .on("click", (event, d) => {
-        window.open(d.url, "_blank");  
+        window.open(d.url, "_blank");
       });
 
     const labels = g
