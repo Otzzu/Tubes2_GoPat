@@ -116,11 +116,7 @@ export default function Search() {
     setisLoading(true);
 
     try {
-<<<<<<< HEAD:fe/src/app/search/page.tsx
-      const response = await fetch(`http://localhost:8080/search/BFS3`, {
-=======
       const response = await fetch(`http://localhost:8080/search/${selectedAlgorithm}`, {
->>>>>>> d41e66488dc06bb8e683fe9461bee79ee3b19c45:src/fe/src/app/search/page.tsx
         method: "POST",
         headers: {
           "Content-Type": "application/json",

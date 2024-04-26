@@ -1,4 +1,4 @@
-FROM node:20-alpine3.19
+FROM node:21-alpine3.19
 
 RUN addgroup app && adduser -S -G app app
 
@@ -18,6 +18,8 @@ RUN npm install
 
 COPY . .
 
+RUN npm run build
+
 EXPOSE 3000
 
-CMD npm run dev
+CMD npm run start

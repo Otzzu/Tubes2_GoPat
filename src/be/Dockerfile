@@ -1,5 +1,5 @@
 # Start by building from the official Golang base image
-FROM golang:1.18-alpine as builder
+FROM golang:1.22-alpine as builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 RUN go build -o main .
 
 # Start a new stage from scratch
-FROM alpine:latest  
+FROM alpine:3.19
 
 WORKDIR /root/
 
