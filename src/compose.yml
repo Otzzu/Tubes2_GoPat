@@ -1,12 +1,50 @@
 version: '3.8'
 
 services:
+  postgres:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    container_name: my_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    networks:
+      stima-network:
+        aliases:
+          - postgresql.stima.local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/dumps:/dumps
+  backend:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080 
+    volumes:
+      - ./be:/app
+    depends_on: [postgres]
+    environment:
+      DATABASE_HOST: postgresql.stima.local
+      DATABASE_PORT: 5432 
+      GIN_MODE: release
+    networks:
+      stima-network:
+        aliases:
+          - api.local  
   frontend:
     build: 
       context: ./fe
       dockerfile: Dockerfile
     ports:
       - 3000:3000
+    depends_on:
+      - backend
+      - postgres
     develop:
       watch:
         - path: ./fe/package.json
@@ -21,18 +59,8 @@ services:
           target: /app
           action: sync
 
-  backend:
-    build:
-      context: ./be
-      dockerfile: Dockerfile
-    ports:
-      - 8080:8080  # Expose the port that your Gin application runs on
-    volumes:
-      - ./be:/app  # Sync local changes to the container
-    environment:
-      - GIN_MODE=release  # Set Gin to run in release mode
-
-
+networks:
+  stima-network:
 
 volumes:
-  tes: 
+  postgres_data: 

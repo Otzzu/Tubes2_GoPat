@@ -3,6 +3,7 @@ package services
 import (
 	// "be/models"
 	// "be/repository"
+	"be/repository"
 	"container/list"
 	"fmt"
 	"sync/atomic"
@@ -100,8 +101,12 @@ func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, err
 
 func ScrapeWikipediaLinks(url string) ([]string, error) {
 	if val, exist := cache.Load(url); exist {
-
 		return val.([]string), nil
+	} else {
+		if exist, err := repository.GetChildrenByParent(url); err == nil {
+			cache.Store(url, exist)
+			return exist, nil
+		}
 	}
 
 	result := make([]string, 0)
@@ -153,15 +158,10 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 
 	c.Visit(url)
 
-	
 	if len(result) > 0 {
 
 		cache.Store(url, result)
-		// _, err := repository.CreateData(&models.DataRequest{Parent: url, Children: result})
-
-		// if err != nil {
-		// 	fmt.Println(err)
-		// }
+		repository.SaveArticleWithChildren(url, result)
 	}
 
 	return result, nil
@@ -178,10 +178,9 @@ func CompareArrays(arr1, arr2 []string) bool {
 		countMap[item]++
 	}
 
-
 	for _, item := range arr2 {
 		if countMap[item] == 0 {
-			return false 
+			return false
 		}
 		countMap[item]--
 	}
@@ -204,7 +203,7 @@ func isVisible(e *colly.HTMLElement) bool {
 
 	// Check parent elements for visibility
 	for parent := e.DOM.Parent(); parent.Length() != 0; parent = parent.Parent() {
-		
+
 		parentClass, found := parent.Attr("class")
 		parentClass = strings.ReplaceAll(parentClass, " ", "")
 		if found && strings.Contains(parentClass, "nowraplinks") {
@@ -234,7 +233,6 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 			// fmt.Println(runtime.NumGoroutine())
 
 			res, _ := ScrapeWikipediaLinks(url)
-			atomic.AddUint32(count, 1)
 			for _, u := range res {
 				// fmt.Println(u)
 				// fmt.Println(goal, "goal")
@@ -253,6 +251,7 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 						newPath := make([]string, len(path))
 						copy(newPath, path)
 						newPath = append(newPath, u)
+						atomic.AddUint32(count, 1)
 						mu.Lock()
 						urls.PushBack(newPath)
 						mu.Unlock()
