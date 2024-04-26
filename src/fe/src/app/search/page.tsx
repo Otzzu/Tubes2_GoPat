@@ -174,6 +174,7 @@ export default function Search() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      console.log(response)
       const data = await response.json();
       console.log("Data received:", data);
       const parsedGraphData = parseDataForGraph(data.paths);
