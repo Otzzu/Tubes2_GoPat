@@ -1,11 +1,14 @@
 package services
 
 import (
+	// "be/models"
+	// "be/repository"
 	"container/list"
 	"fmt"
 	"sync/atomic"
 
 	// "runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,13 +25,13 @@ var (
 		"Category:", "Wikipedia:", "File:", "Help:", "Portal:",
 		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
 	}
-	maxConcurrency = 40
+	maxConcurrency = 20
 	cache          sync.Map
 )
 
 func isExcluded(link string) bool {
-	if link == "https://en.wikipedia.org/wiki/Main_Page" {
-		return false
+	if link == "/wiki/Main_Page" {
+		return true
 	}
 
 	for _, ns := range excludedNamespaces2 {
@@ -97,10 +100,8 @@ func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, err
 
 func ScrapeWikipediaLinks(url string) ([]string, error) {
 	if val, exist := cache.Load(url); exist {
-		if len(val.([]string)) > 0 {
 
-			return val.([]string), nil
-		}
+		return val.([]string), nil
 	}
 
 	result := make([]string, 0)
@@ -118,6 +119,10 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 	})
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		if !isVisible(e) {
+			return
+		}
+
 		link := e.Attr("href")
 		// fmt.Println("tes")
 		if combinedRegex.MatchString(link) {
@@ -140,7 +145,6 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 				fmt.Println("Request failed after retries:", r.Request.URL, "\nError:", err)
 			}
 		}
-		// fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	c.OnRequest(func(r *colly.Request) {
@@ -149,12 +153,66 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 
 	c.Visit(url)
 
-	if (len(result) > 0){
+	
+	if len(result) > 0 {
 
 		cache.Store(url, result)
+		// _, err := repository.CreateData(&models.DataRequest{Parent: url, Children: result})
+
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
 	}
 
 	return result, nil
+}
+
+func CompareArrays(arr1, arr2 []string) bool {
+	if len(arr1) != len(arr2) {
+		return false
+	}
+
+	countMap := make(map[string]int)
+
+	for _, item := range arr1 {
+		countMap[item]++
+	}
+
+
+	for _, item := range arr2 {
+		if countMap[item] == 0 {
+			return false 
+		}
+		countMap[item]--
+	}
+
+	for _, count := range countMap {
+		if count != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isVisible(e *colly.HTMLElement) bool {
+	class := e.Attr("class")
+	class = strings.ReplaceAll(class, " ", "")
+	if strings.Contains(class, "nowraplinks") {
+		return false
+	}
+
+	// Check parent elements for visibility
+	for parent := e.DOM.Parent(); parent.Length() != 0; parent = parent.Parent() {
+		
+		parentClass, found := parent.Attr("class")
+		parentClass = strings.ReplaceAll(parentClass, " ", "")
+		if found && strings.Contains(parentClass, "nowraplinks") {
+			// fmt.Println(e.Attr("href"))
+			return false
+		}
+	}
+	return true
 }
 
 func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *sync.WaitGroup, count *uint32) [][]string {
@@ -216,14 +274,11 @@ func b(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *s
 
 }
 
-
-
 func AsyncBFSMulti(start, goal string) ([][]string, int) {
 	var visited sync.Map
 	semp := make(chan struct{}, maxConcurrency)
 	var wg sync.WaitGroup
 	var countChecked uint32 = 1
-
 
 	queue := list.New()
 	queue.PushBack([]string{start})
@@ -244,70 +299,70 @@ func AsyncBFSMulti(start, goal string) ([][]string, int) {
 }
 
 func reconstructPath(start, goal string, parent *sync.Map) []string {
-    var path []string
-    for at := goal; at != start; {
-        path = append([]string{at}, path...)
-        p, _ := parent.Load(at)
-        at = p.(string)
-    }
+	var path []string
+	for at := goal; at != start; {
+		path = append([]string{at}, path...)
+		p, _ := parent.Load(at)
+		at = p.(string)
+	}
 	path = append([]string{start}, path...)
 
-    return path
+	return path
 }
 
 func AsyncBFS7(start, goal string) ([]string, int) {
-    visited := &sync.Map{}
-    parent := &sync.Map{}
-    queue := []string{start}
-    visited.Store(start, true)
+	visited := &sync.Map{}
+	parent := &sync.Map{}
+	queue := []string{start}
+	visited.Store(start, true)
 
-    var wg sync.WaitGroup
-    var mutex sync.Mutex
-    var found uint32
-    var count int32
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
+	var found uint32
+	var count int32
 
-    for len(queue) > 0 && atomic.LoadUint32(&found) == 0 {
-        currentBatch := make([]string, len(queue))
-        copy(currentBatch, queue)
-        queue = []string{}
+	for len(queue) > 0 && atomic.LoadUint32(&found) == 0 {
+		currentBatch := make([]string, len(queue))
+		copy(currentBatch, queue)
+		queue = []string{}
 
-        for _, url := range currentBatch {
-            wg.Add(1)
-            go func(url string) {
-                defer wg.Done()
-                if atomic.LoadUint32(&found) == 1 {
-                    return
-                }
-                links, err := ScrapeWikipediaLinks(url)
-                if err != nil {
-                    fmt.Println("Error scraping:", err)
-                    return
-                }
-                atomic.AddInt32(&count, 1)
+		for _, url := range currentBatch {
+			wg.Add(1)
+			go func(url string) {
+				defer wg.Done()
+				if atomic.LoadUint32(&found) == 1 {
+					return
+				}
+				links, err := ScrapeWikipediaLinks(url)
+				if err != nil {
+					fmt.Println("Error scraping:", err)
+					return
+				}
+				atomic.AddInt32(&count, 1)
 
-                for _, link := range links {
-                    if link == goal {
-                        atomic.StoreUint32(&found, 1)
-                        parent.Store(goal, url)
-                        return
-                    }
+				for _, link := range links {
+					if link == goal {
+						atomic.StoreUint32(&found, 1)
+						parent.Store(goal, url)
+						return
+					}
 
-                    if _, loaded := visited.LoadOrStore(link, true); !loaded {
-                        parent.Store(link, url)
-                        mutex.Lock()
-                        queue = append(queue, link)
-                        mutex.Unlock()
-                    }
-                }
-            }(url)
-        }
-        wg.Wait()
-    }
+					if _, loaded := visited.LoadOrStore(link, true); !loaded {
+						parent.Store(link, url)
+						mutex.Lock()
+						queue = append(queue, link)
+						mutex.Unlock()
+					}
+				}
+			}(url)
+		}
+		wg.Wait()
+	}
 
-    if atomic.LoadUint32(&found) == 1 {
-        return reconstructPath(start, goal, parent), int(count)
-    }
-    return nil, int(count)
+	if atomic.LoadUint32(&found) == 1 {
+		return reconstructPath(start, goal, parent), int(count)
+	}
+	return nil, int(count)
 }
 
 func AsyncBFS3(start, goal string) ([]string, int) {
@@ -340,14 +395,13 @@ func AsyncBFS3(start, goal string) ([]string, int) {
 				}
 
 				res, _ := ScrapeWikipediaLinks(url)
-				atomic.AddUint32(&count, 1)
 				for _, link := range res {
 					if found {
 						return
 					}
 
 					if link == goal {
-						
+
 						path := []string{goal}
 						for at := url; at != start; {
 							path = append([]string{at}, path...)
@@ -367,6 +421,8 @@ func AsyncBFS3(start, goal string) ([]string, int) {
 					}
 
 					if _, exist := visited.LoadOrStore(link, true); !exist {
+						atomic.AddUint32(&count, 1)
+
 						parent.Store(link, url)
 						if !found {
 							mutex.Lock()
@@ -402,7 +458,7 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 	queue := []string{start}
 	visited.Store(start, true)
 
-	for len(queue) > 0 {
+	for len(queue) > 0 && !found {
 		local := queue
 		queue = []string{}
 
@@ -421,7 +477,6 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 
 				for _, url := range links {
 					res, _ := ScrapeWikipediaLinks(url)
-					atomic.AddUint32(&countChecked, 1)
 					for _, link := range res {
 						if found {
 							return
@@ -447,6 +502,8 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 						}
 
 						if _, exist := visited.LoadOrStore(link, true); !exist {
+							atomic.AddUint32(&countChecked, 1)
+
 							parent.Store(link, url)
 							mutex.Lock()
 							if !found {
@@ -484,7 +541,6 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 	queue := []string{start}
 	visited.Store(start, true)
 
-
 	var resultPath []string
 	var found bool
 
@@ -505,7 +561,7 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 	})
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		if found {
-			
+
 			return
 		}
 		href := e.Attr("href")
@@ -513,7 +569,6 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 		if combinedRegex.MatchString(href) {
 			link := "https://en.wikipedia.org" + href
 			if !isExcluded(link) {
-				
 
 				if link == goal {
 					path := []string{goal}
@@ -535,6 +590,8 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 				}
 
 				if _, exist := visited.LoadOrStore(link, true); !exist {
+					atomic.AddUint32(&countChecked, 1)
+
 					parent.Store(link, url)
 					mutex.Lock()
 					if !found {
@@ -574,7 +631,6 @@ func AsyncBFS6(start, goal string) ([]string, int) {
 
 					mutex.Unlock()
 					c.Visit(url)
-					atomic.AddUint32(&countChecked, 1)
 				}
 			}()
 		}

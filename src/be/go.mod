@@ -1,13 +1,12 @@
 module be
 
-go 1.21.0
+go 1.22.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.9.1
 	github.com/gin-contrib/cors v1.7.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/validator/v10 v10.19.0
-	github.com/gocolly/colly v1.2.0
 	github.com/gocolly/colly/v2 v2.1.0
 )
 

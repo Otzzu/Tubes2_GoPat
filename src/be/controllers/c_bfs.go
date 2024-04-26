@@ -94,7 +94,18 @@ func SearchBFSMulti(ctx *gin.Context) {
 			newPath = append(newPath, services.DecodePercentEncodedString(path))
 		}
 
-		newPaths = append(newPaths, newPath)
+		same := false
+		for _, p := range newPaths {
+			if services.CompareArrays(p, newPath) {
+				same = true
+				return
+			}
+		}
+
+		if !same {
+
+			newPaths = append(newPaths, newPath)
+		}
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"paths": newPaths, "found": true, "message": "path found", "executionTime": duration, "countChecked": countChecked})
