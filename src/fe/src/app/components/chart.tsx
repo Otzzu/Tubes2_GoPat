@@ -6,6 +6,7 @@ import { SimulationNodeDatum, SimulationLinkDatum } from "d3";
 export interface Node extends SimulationNodeDatum {
   id: string;
   group: number;
+  url: string;
 }
 
 export interface Link extends SimulationLinkDatum<Node> {
@@ -19,22 +20,25 @@ export interface GraphData {
 }
 
 const color = d3.scaleOrdinal(d3.schemeCategory10);
-const createLegendData = (graphData: GraphData) => {
-  return graphData.nodes.map((node, index) => {
-    let text;
-    if (index === 0) {
+const createLegendData = (len: number) => {
+  var data = [];
+  var text = "";
+  for (let i = 0; i < len; i++) {
+    if (i === 0) {
       text = "Start page";
-    } else if (index === graphData.nodes.length - 1) {
+    } else if (i === len - 1) {
       text = "End page";
     } else {
-      text = `${index} degree${index > 1 ? "s" : ""} away`;
+      text = `${i} degree${i > 1 ? "s" : ""} away`;
     }
-    return {
-      color: color(node.group.toString()),
+    data.push({
+      color: color(i.toString()),
       text: text,
-      group: node.group,
-    };
-  });
+      group: i,
+    });
+  }
+
+  return data;
 };
 
 export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
@@ -44,10 +48,12 @@ export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
 
   pathsArray.forEach((path) => {
     for (let i = 0; i < path.length; i++) {
-      const name = path[i].split("/").pop()!.replace(/_/g, " ");
+      const url = path[i];
+      console.log("ini url",url);
+      const name = url.split("/").pop()!.replace(/_/g, " ");
       if (!nodeNameSet.has(name)) {
         nodeNameSet.add(name);
-        nodes.push({ id: name, group: i });
+        nodes.push({ id: name, group: i ,url:url});
       }
       if (i > 0) {
         const sourceName = path[i - 1].split("/").pop()!.replace(/_/g, " ");
@@ -62,7 +68,12 @@ export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
   return { nodes, links };
 };
 
-const Graph: React.FC<{ data: GraphData }> = ({ data }) => {
+export const extractTitleFromUrl = (url: string): string => {
+  const title = new URL(url).pathname.split("/").pop();
+  return title || "";
+};
+
+const Graph: React.FC<{ data: GraphData; len: number }> = ({ data, len }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
 
@@ -100,7 +111,7 @@ const Graph: React.FC<{ data: GraphData }> = ({ data }) => {
       .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const legendData = createLegendData(data);
+    const legendData = createLegendData(len);
 
     const legend = svg
       .append("g")
@@ -111,22 +122,25 @@ const Graph: React.FC<{ data: GraphData }> = ({ data }) => {
       .enter()
       .append("g")
       .attr("class", "legend")
-      .attr("transform", (d, i) => `translate(0, ${i * 20})`); 
+      .attr("transform", (d, i) => `translate(0, ${i * 20})`);
 
     // Draw legend colored rectangles
     legend
       .append("circle")
       .attr("cx", 10)
       .attr("cy", 9)
-      .attr("r", 5)
+      .attr("r", 8)
+      .attr("stroke", (d, i) => i === 0 || i === data.nodes.length - 1 ? "#1A535C" : "rgb(125, 62, 7)")
+      .attr("stroke-width", 2)
       .style("fill", (d) => d.color);
+      
 
     // Draw legend text
     legend
       .append("text")
       .attr("x", 25)
       .attr("y", 9)
-      .attr("dy", ".35em") 
+      .attr("dy", ".35em")
       .text((d) => d.text)
       .style("font-family", "Poppins")
       .style("font-size", 15);
@@ -141,13 +155,17 @@ const Graph: React.FC<{ data: GraphData }> = ({ data }) => {
 
     const node = g
       .append("g")
-      .attr("stroke", "#fff")
-      .attr("stroke-width", 1.5)
       .selectAll<SVGCircleElement, Node>("circle")
       .data(data.nodes)
       .join("circle")
       .attr("r", (d, i) => (i === 0 || i === data.nodes.length - 1 ? 20 : 15))
-      .attr("fill", (d) => color(d.group.toString()));
+      .attr("fill", (d) => color(d.group.toString()))
+      .attr("stroke", (d, i) => i === 0 || i === data.nodes.length - 1 ? "#1A535C" : "rgb(125, 62, 7)")
+      .attr("stroke-width", 3.5)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        window.open(d.url, "_blank");  
+      });
 
     const labels = g
       .append("g")
