@@ -20,6 +20,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/out:/out
+      - ./db/dumps/dumpfile.sql:/docker-entrypoint-initdb.d/dumpfile.sql
   backend:
     build:
       context: ./be
