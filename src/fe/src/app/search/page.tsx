@@ -83,7 +83,7 @@ export default function Search() {
   };
 
   const fetchAdditionalDetails = async (paths: string[][]) => {
-    console.log(paths);
+    console.log("ini paths",paths);
     const details: SearchResultDetails[][] = [];
 
     for (let i = 0; i < paths.length; i++) {
@@ -113,7 +113,6 @@ export default function Search() {
     const timer = setTimeout(() => {
       fetchResults(sourceInput, setSourceResults);
     }, 300);
-    console.log(sourceInput);
     return () => clearTimeout(timer);
   }, [sourceInput]);
 
@@ -121,7 +120,6 @@ export default function Search() {
     const timer = setTimeout(() => {
       fetchResults(destinationInput, setDestinationResults);
     }, 300);
-    console.log(destinationInput);
     return () => clearTimeout(timer);
   }, [destinationInput]);
 
@@ -141,6 +139,7 @@ export default function Search() {
 
   const handleAlgorithmSelection = (algorithm: string) => {
     setSelectedAlgorithm(algorithm);
+    setIsMultiPath(false);
     setShowResult(false);
   };
 
@@ -149,8 +148,8 @@ export default function Search() {
   };
 
   const handleSearchMulti = async () => {
-    console.log("multi");
     setShowResult(false);
+    console.log("ini multi");
     if (!selectedAlgorithm || !sourceInput || !destinationInput) {
       alert(
         "Please select an algorithm and enter both a source and a destination."
@@ -174,7 +173,6 @@ export default function Search() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log(response)
       const data = await response.json();
       console.log("Data received:", data);
       const parsedGraphData = parseDataForGraph(data.paths);
@@ -195,7 +193,7 @@ export default function Search() {
 
   useEffect(() => {
     const data = isMultiPath;
-    console.log(data);
+    console.log("ini data",data);
   }, [isMultiPath]);
 
   const handleSearchSingle = async () => {

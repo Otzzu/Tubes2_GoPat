@@ -64,7 +64,7 @@ const PathsDisplay: React.FC<Props> = ({
                   href={detail.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="path-card flex flex-row border-b border-[#1A535C] space-x-4 p-2 hover:bg-[#A1B6BA]"
+                  className="path-card flex flex-row border-b border-[#1A535C] space-x-4 p-2 hover:bg-[#A1B6BA] w-full"
                 >
                   <div className="min-w-[70px] min-h-[50px] relative rounded-lg border-[#1A535C] border">
                     <Image

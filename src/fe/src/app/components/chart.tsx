@@ -49,7 +49,6 @@ export const parseDataForGraph = (pathsArray: string[][]): GraphData => {
   pathsArray.forEach((path) => {
     for (let i = 0; i < path.length; i++) {
       const url = path[i];
-      console.log("ini url", url);
       const name = url.split("/").pop()!.replace(/_/g, " ");
       if (!nodeNameSet.has(name)) {
         nodeNameSet.add(name);

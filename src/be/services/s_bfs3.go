@@ -284,6 +284,10 @@ func AsyncBFSMulti(start, goal string) ([][]string, int) {
 	var wg sync.WaitGroup
 	var countChecked uint32 = 1
 
+	if(start == goal){
+		return [][]string{{start}}, 1
+	}
+
 	queue := list.New()
 	queue.PushBack([]string{start})
 	visited.Store(start, true)
@@ -461,6 +465,10 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 
 	queue := []string{start}
 	visited.Store(start, true)
+
+	if(start == goal){
+		return []string{start}, 1
+	}
 
 	for len(queue) > 0 && !found {
 		local := queue

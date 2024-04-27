@@ -135,12 +135,12 @@ func lds(start string, goal string, maxDepth int, cached *map[string][]string, c
                 links, _ = ScrapeWikipediaLinks(lastNode)
                 
                 (*cached)[lastNode] = links
-                (*count)++  // Increment the counter for each scrape
             }
 
             for _, link := range links {
                 if !visited[link] {
                     visited[link] = true
+					(*count)++  // Increment the counter for each scrape
                     newPath := append([]string(nil), path...) // Make a copy of the path
                     newPath = append(newPath, link)
                     stack = append(stack, newPath) // Push to the stack
@@ -157,6 +157,9 @@ func lds(start string, goal string, maxDepth int, cached *map[string][]string, c
 func IDS(start string, goal string, maxDepth int) ([]string, int){
     cached := make(map[string][]string)
 
+	if(start == goal){
+		return []string{start}, 1
+	}
 	var countChecked uint32
 	i := 0
 	for  {
