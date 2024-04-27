@@ -1,6 +1,6 @@
 <h1 align="center">Tugas Besar 2 IF2211 Strategy Algorithm</h1>
-<h1 align="center">Semester II Tahun 2023/2024  </h1>
-<h1 align="center">Utilization of IDS Algorithm and BFS in the WikiRace Game<</h1>
+<h1 align="center">Semester II Tahun 2023/2024</h1>
+<h1 align="center">Utilization of IDS Algorithm and BFS in the WikiRace Game</h1>
 
 - [Overview](#overview)
 - [Abstraction](#abstraction)
@@ -11,6 +11,7 @@
 ## Overview
 
 <h1>Kelompok 26: GoPat</h1>
+
 | NIM      | Nama               | Kelas |
 | -------- | ------------------ | ----- |
 | 13522021 | Filbert            | K-01  |
