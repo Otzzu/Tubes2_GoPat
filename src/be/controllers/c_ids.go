@@ -19,6 +19,7 @@ func SearchIDS(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Error Bind JSON"})
 		return
 	}
+	
 	validator := validator.New()
 	if err := validator.Struct(input); err != nil {
 		fmt.Println("Error Validator")
@@ -26,17 +27,13 @@ func SearchIDS(ctx *gin.Context) {
 		return
 	}
 
-
 	// paths, err := services.IDS(fullPathStart, fullPathGoal, 5)
 	start := time.Now()
 
 	paths, countChecked := services.IDS(input.Start, input.Goal, 8)
 	duration := time.Since(start).Milliseconds()
 
-
 	if (paths == nil) {
-		// fmt.Println(err.Error())
-
 		ctx.JSON(http.StatusNotFound, gin.H{"found": false, "message": "path not found", "executionTime" : duration})
 
 		return
@@ -48,6 +45,4 @@ func SearchIDS(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"paths": [][]string{newPath} ,"found": true, "countChecked" : countChecked, "message": "path found", "executionTime" : duration})
-	return
-
 }
