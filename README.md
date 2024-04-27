@@ -73,7 +73,7 @@ To run this project, you will need to perform several installations, including:
 
 **NOTE : It is recommended to have docker to run this project. So, download [Docker](https://www.docker.com/products/docker-desktop/) in the internet first, before continuing to the program**
 
-## Installation With Docker
+## Installation With Docker No Caching
 
 Make sure Docker is installed on your system. If not, install [Docker](https://www.docker.com/products/docker-desktop/) according to the official instructions from the Docker website. If Docker is already installed, follow these steps:
 
@@ -92,18 +92,40 @@ cd ./Tubes2_GoPat
 3. Ensure Docker Desktop is running. Once the user is in the root directory, run the following command in the terminal:
 
 ```shell
-docker compose build
+docker compose up --build
 ```
+6. To access the website, go to the following link in your web browser: [http://localhost:3000](http://localhost:3000)
 
-4. Once the docker compose build command has finished, run the following command:
+7. After successfully launching the website, users can choose the search algorithm, either using BFS or IDS. Once the user selects the search algorithm, they need to enter the title of the source and target Wikipedia articles. The program will also provide Wikipedia article recommendations based on the titles entered by the user. The program will display the shortest route between the two articles in the form of a graph visualization, along with execution time, the number of articles traversed, and the search depth.
+
+## Installation With Docker With Caching
+
+Make sure Docker is installed on your system. If not, install [Docker](https://www.docker.com/products/docker-desktop/) according to the official instructions from the Docker website. If Docker is already installed, follow these steps:
+
+1. Clone this repository :
 
 ```shell
-docker compose up
+git clone https://github.com/Otzzu/Tubes2_GoPat.git
+```
+2. Download the dump file in this link: https://drive.google.com/drive/folders/1TkPVTfJu7VWU9aeWAx-jk1esvYSHhE0p?usp=sharing. Put the dump file in _./src/db/dumps_. Ensure the name of dumpfile is _dumpfile.sql_
+
+3. Navigate to the root directory of the program by running the following command in the terminal:
+
+```shell
+cd ./Tubes2_GoPat
 ```
 
+4. Ensure Docker Desktop is running. Once the user is in the root directory, run the following command in the terminal: (Due to the large size of the dump, this might take some time and the backend container may restart repeatedly until the database is ready and the backend can connect properly.)
+
+```shell
+docker compose up --build
+```
 5. To access the website, go to the following link in your web browser: [http://localhost:3000](http://localhost:3000)
 
-6. After successfully launching the website, users can choose the search algorithm, either using BFS or IDS. Once the user selects the search algorithm, they need to enter the title of the source and target Wikipedia articles. The program will also provide Wikipedia article recommendations based on the titles entered by the user. The program will display the shortest route between the two articles in the form of a graph visualization, along with execution time, the number of articles traversed, and the search depth.
+6. After successfully launching the website, users can choose the search algorithm, either using BFS or IDS. Once the user selects the search algorithm, they need to enter the title of the source and target Wikipedia articles. The program will also provide Wikipedia article recommendations based on the titles entered by the user. The program will display the shortest route between the two articles in the form of a graph visualization, along with execution time, the number of articles traversed, and the search depth. 
+
+7. Noted: Always delete all image, container, and volumes if want to load new dump file dan rerun dan rebuild the docker.
+
 
 ## Documentation
 
