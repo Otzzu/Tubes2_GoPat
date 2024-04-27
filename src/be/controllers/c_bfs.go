@@ -148,13 +148,9 @@ func SearchBFS2(ctx *gin.Context) {
 		return
 	}
 
-	// fullLinkStart := "https://en.wikipedia.org/wiki/" + input.Start
-	// fullLinkGoal := "https://en.wikipedia.org/wiki/" + input.Goal
-
-	// paths, err := services.MainBFS(fullPathStart, fullPathGoal)
-	// paths, _ := services.BFS2(fullLinkStart, fullLinkGoal)
 	start := time.Now()
 	paths, countChecked := services.AsyncBFS5(input.Start, input.Goal)
+	fmt.Println("TES")
 	duration := time.Since(start).Milliseconds()
 
 	if paths == nil {

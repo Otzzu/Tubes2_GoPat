@@ -212,7 +212,7 @@ export default function Search() {
 
     try {
       const response = await fetch(
-        `http://localhost:8080/search/${selectedAlgorithm}2`,
+        `http://localhost:8080/search/${selectedAlgorithm}`,
         {
           method: "POST",
           headers: {

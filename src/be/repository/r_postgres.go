@@ -14,19 +14,22 @@ import (
 var Db *sqlx.DB
 
 func GetChildrenByParent(parent string) ([]string, error) {
-    var children []string
-    query := `SELECT c.child 
-              FROM children c 
-              JOIN articles a ON c.article_id = a.id 
-              WHERE a.parent = $1`
+    var results []pq.StringArray
+    query := `SELECT children FROM articles WHERE parent = $1`
 
-    err := Db.Select(&children, query, parent)
+    err := Db.Select(&results, query, parent)
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("error querying children by parent: %v", err)
     }
-    if len(children) == 0 {
+    if len(results) == 0 {
         return nil, nil  // Return nil explicitly if no children found
     }
+
+    var children []string
+    for _, childArray := range results {
+        children = append(children, childArray...)
+    }
+
     return children, nil
 }
 

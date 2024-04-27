@@ -6,6 +6,7 @@ services:
       context: ./db
       dockerfile: Dockerfile
     container_name: my_postgres
+    restart: always
     ports:
       - "5432:5432"
     environment:
@@ -18,7 +19,7 @@ services:
           - postgresql.stima.local
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/dumps:/dumps
+      - ./db/out:/out
   backend:
     build:
       context: ./be
@@ -28,6 +29,7 @@ services:
     volumes:
       - ./be:/app
     depends_on: [postgres]
+    restart: on-failure
     environment:
       DATABASE_HOST: postgresql.stima.local
       DATABASE_PORT: 5432 

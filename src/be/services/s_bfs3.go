@@ -27,7 +27,7 @@ var (
 		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
 	}
 	maxConcurrency = 20
-	cache          sync.Map
+	// cache          sync.Map
 )
 
 func isExcluded(link string) bool {
@@ -100,14 +100,17 @@ func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, err
 }
 
 func ScrapeWikipediaLinks(url string) ([]string, error) {
-	if val, exist := cache.Load(url); exist {
-		return val.([]string), nil
-	} else {
-		if exist, err := repository.GetChildrenByParent(url); err == nil {
-			cache.Store(url, exist)
-			return exist, nil
+	// if val, exist := cache.Load(url); exist {
+	// 	return val.([]string), nil
+	// } else {
+	if exist, err := repository.GetChildrenByParent(url); exist != nil {
+		if err != nil {
+			return nil, err
 		}
+		// fmt.Println(exist)
+		return exist, nil
 	}
+	// }
 
 	result := make([]string, 0)
 
@@ -160,8 +163,10 @@ func ScrapeWikipediaLinks(url string) ([]string, error) {
 
 	if len(result) > 0 {
 
-		cache.Store(url, result)
-		repository.SaveArticleWithChildren(url, result)
+		err := repository.SaveArticleWithChildren(url, result)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	return result, nil
@@ -462,14 +467,14 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 		queue = []string{}
 
 		batchsize := (len(local) / maxConcurrency) + 1
-		// fmt.Println(batchsize)
+		fmt.Println(batchsize)
 
 		for i := 0; i < len(local); i += batchsize {
 			end := i + batchsize
 			if end > len(local) {
 				end = len(local)
 			}
-			fmt.Println(i)
+			// fmt.Println(i)
 			wg.Add(1)
 			go func(links []string) {
 				defer wg.Done()
@@ -477,9 +482,12 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 				for _, url := range links {
 					res, _ := ScrapeWikipediaLinks(url)
 					for _, link := range res {
+						mutex.Lock()
 						if found {
+							mutex.Unlock()
 							return
 						}
+						mutex.Unlock()
 
 						if link == goal {
 							path := []string{goal}
@@ -508,6 +516,8 @@ func AsyncBFS5(start, goal string) ([]string, int) {
 							if !found {
 								queue = append(queue, link)
 							} else {
+								mutex.Unlock()
+
 								return
 							}
 							mutex.Unlock()
