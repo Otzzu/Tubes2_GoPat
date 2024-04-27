@@ -78,23 +78,27 @@ Make sure Docker is installed on your system. If not, install [Docker](https://w
 
 1. Clone this repository :
 
-shell
+```shell
 git clone https://github.com/Otzzu/Tubes2_GoPat.git
+```
 
 2. Navigate to the root directory of the program by running the following command in the terminal:
 
-shell
+```shell
 cd ./Tubes2_GoPat
+```
 
 3. Ensure Docker Desktop is running. Once the user is in the root directory, run the following command in the terminal:
 
-shell
+```shell
 docker compose build
+```
 
 4. Once the docker compose build command has finished, run the following command:
 
-shell
+```shell
 docker compose up
+```
 
 5. To access the website, go to the following link in your web browser: [http://localhost:3000](http://localhost:3000)
 

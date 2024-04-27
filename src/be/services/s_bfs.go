@@ -1,15 +1,12 @@
 package services
 
 import (
-	// "be/models"
-	// "be/repository"
 	"be/repository"
 	"container/list"
 	"fmt"
 	"net/url"
 	"sync/atomic"
 
-	// "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -28,7 +25,6 @@ var (
 		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
 	}
 	maxConcurrency = 20
-	// cache          sync.Map
 )
 
 func isExcluded(link string) bool {
@@ -93,12 +89,12 @@ func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, err
 	return []string{}, nil
 }
 
-func DecodePercentEncodedString(encodedString string) (string) {
-    decodedString, err := url.QueryUnescape(encodedString)
-    if err != nil {
-        return encodedString // return the error if the decoding fails
-    }
-    return decodedString
+func DecodePercentEncodedString(encodedString string) string {
+	decodedString, err := url.QueryUnescape(encodedString)
+	if err != nil {
+		return encodedString // return the error if the decoding fails
+	}
+	return decodedString
 }
 
 func ScrapeWikipediaLinks(url string) ([]string, error) {
@@ -273,7 +269,7 @@ func AsyncBFSMulti(start, goal string) ([][]string, int) {
 	var wg sync.WaitGroup
 	var countChecked uint32 = 1
 
-	if(start == goal){
+	if start == goal {
 		return [][]string{{start}}, 1
 	}
 
@@ -307,7 +303,7 @@ func AsyncBFS(start, goal string) ([]string, int) {
 	queue := []string{start}
 	visited.Store(start, true)
 
-	if(start == goal){
+	if start == goal {
 		return []string{start}, 1
 	}
 
