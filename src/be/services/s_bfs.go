@@ -1,546 +1,386 @@
 package services
 
 import (
-	"be/models"
+	// "be/models"
+	// "be/repository"
+	"be/repository"
 	"container/list"
 	"fmt"
+	"net/url"
+	"sync/atomic"
+
+	// "runtime"
+	"strings"
+	"sync"
+	"time"
+
+	"regexp"
+
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/queue"
 )
 
+var (
+	combinedRegex = regexp.MustCompile(`^/wiki/([^#:\s]+)$`)
 
+	excludedNamespaces2 = []string{
+		"Category:", "Wikipedia:", "File:", "Help:", "Portal:",
+		"Special:", "Talk:", "User_template:", "Template_talk:", "Mainpage:",
+	}
+	maxConcurrency = 20
+	// cache          sync.Map
+)
 
-
-func BFS(start string, goal string, findAllPaths bool) ([][]string, error) {
-	queue := list.New()
-	queue.PushBack([]string{start})
-
-	visited := make(map[string]bool)
-	visited[start] = true
-
-	var paths [][]string
-	foundDepth := -1
-
-	for queue.Len() > 0 {
-		path := queue.Remove(queue.Front()).([]string)
-		lastNode := path[len(path)-1]
-		currentDepth := len(path) - 1
-
-		if lastNode == goal {
-			if foundDepth == -1 || currentDepth == foundDepth {
-				paths = append(paths, path)
-				foundDepth = currentDepth
-				if !findAllPaths {
-					return paths, nil
-				}
-				continue
-			}
-		}
-
-		if foundDepth != -1 && currentDepth > foundDepth {
-			continue
-		}
-
-		links, err := ScrapeWikipediaQuery(lastNode)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, link := range links {
-			if !visited[link] {
-				visited[link] = true
-				newPath := make([]string, len(path))
-				copy(newPath, path)
-				newPath = append(newPath, link)
-				queue.PushBack(newPath)
-			}
-		}
+func isExcluded(link string) bool {
+	if link == "/wiki/Main_Page" {
+		return true
 	}
 
-	if len(paths) > 0 {
-		return paths, nil
-	}
-	return nil, fmt.Errorf("path not found")
-}
-
-func BFS2(start string, goal string) ([]string, error) {
-	LinkCache = make(map[string][]string)
-	queue := list.New()
-	queue.PushBack([]models.Node{{Name: start, IsBegin: true}})
-	queue.PushBack([]models.Node{{Name: goal, IsBegin: false}})
-
-	visited := make(map[string]models.VisitedVal)
-	visited[start] = models.VisitedVal{Depth: 0, IsBegin: true, Path: make([]string, 0, 5)}
-	visited[goal] = models.VisitedVal{Depth: 0, IsBegin: false, Path: make([]string, 0, 5)}
-
-	for queue.Len() > 0 {
-		path := queue.Remove(queue.Front()).([]models.Node)
-		lastNode := path[len(path)-1]
-
-		links, err := ScrapeWikipediaColly(lastNode.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, link := range links {
-			value, exist := visited[link]
-			if exist && value.IsBegin != lastNode.IsBegin {
-				answerPath, err := combine(path, value.Path, link, lastNode.IsBegin)
-				if err != nil {
-					visited[link] = models.VisitedVal{Depth: visited[lastNode.Name].Depth + 1, IsBegin: lastNode.IsBegin, Path: append(visited[lastNode.Name].Path, lastNode.Name)}
-					newPath := make([]models.Node, len(path)+1)
-					copy(newPath, path)
-					newPath[len(path)] = models.Node{Name: link, IsBegin: lastNode.IsBegin}
-					queue.PushBack(newPath)
-					continue
-				}
-
-				return answerPath, nil
-			}
-
-			if !exist {
-				visited[link] = models.VisitedVal{Depth: visited[lastNode.Name].Depth + 1, IsBegin: lastNode.IsBegin, Path: append(visited[lastNode.Name].Path, lastNode.Name)}
-				newPath := make([]models.Node, len(path)+1)
-				copy(newPath, path)
-				newPath[len(path)] = models.Node{Name: link, IsBegin: lastNode.IsBegin}
-				queue.PushBack(newPath)
-			}
-		}
-	}
-	return nil, fmt.Errorf("path not found")
-}
-
-func BFS3(start string, goal string) ([]string, error) {
-	queueFront := list.New()
-	queueBack := list.New()
-	queueFront.PushBack([]string{start})
-	queueBack.PushBack([]string{goal})
-
-	visitedFront := make(map[string]models.VisitedVal)
-	visitedBack := make(map[string]models.VisitedVal)
-	visitedFront[start] = models.VisitedVal{Depth: 0, Path: make([]string, 0, 5)}
-	visitedBack[goal] = models.VisitedVal{Depth: 0, Path: make([]string, 0, 5)}
-
-	for queueFront.Len() > 0 || queueBack.Len() > 0 {
-
-		if queueFront.Len() > 0 {
-
-			path := queueFront.Remove(queueFront.Front()).([]string)
-			lastNode := path[len(path)-1]
-
-			links, err := ScrapeWikipediaColly(lastNode)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, link := range links {
-				value, exist := visitedBack[link]
-				if exist {
-					answerPath, err := combine2(path, value.Path, link)
-					if err != nil {
-						if _, exist2 := visitedFront[link]; !exist2 {
-
-							visitedFront[link] = models.VisitedVal{Depth: visitedFront[lastNode].Depth + 1, Path: append(visitedFront[lastNode].Path, lastNode)}
-							newPath := make([]string, len(path)+1)
-							copy(newPath, path)
-							newPath[len(path)] = link
-							queueFront.PushBack(newPath)
-						}
-						delete(visitedBack, link)
-						continue
-					}
-
-					return answerPath, nil
-				}
-
-				if !exist {
-					if _, exist2 := visitedFront[link]; !exist2 {
-
-						visitedFront[link] = models.VisitedVal{Depth: visitedFront[lastNode].Depth + 1, Path: append(visitedFront[lastNode].Path, lastNode)}
-						newPath := make([]string, len(path)+1)
-						copy(newPath, path)
-						newPath[len(path)] = link
-						queueFront.PushBack(newPath)
-					}
-				}
-			}
-		}
-
-		if queueBack.Len() > 0 {
-
-			path := queueBack.Remove(queueBack.Front()).([]string)
-			lastNode := path[len(path)-1]
-
-			links, err := ScrapeWikipediaColly(lastNode)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, link := range links {
-				value, exist := visitedFront[link]
-				if exist {
-					answerPath, err := combine2(value.Path, path, link)
-					if err == nil {
-
-						return answerPath, nil
-					}
-				}
-
-				if !exist {
-					if _, exist2 := visitedBack[link]; !exist2 {
-
-						visitedBack[link] = models.VisitedVal{Depth: visitedBack[lastNode].Depth + 1, Path: append(visitedBack[lastNode].Path, lastNode)}
-						newPath := make([]string, len(path)+1)
-						copy(newPath, path)
-						newPath[len(path)] = link
-						queueBack.PushBack(newPath)
-					}
-				}
-			}
-		}
-	}
-	return nil, fmt.Errorf("path not found")
-}
-
-func BFS4(start string, goal string) ([]string, error) {
-	queueFront := list.New()
-	queueBack := list.New()
-	queueFront.PushBack([]string{start})
-	queueBack.PushBack([]string{goal})
-
-	visitedFront := make(map[string]models.VisitedVal)
-	visitedBack := make(map[string]models.VisitedVal)
-	visitedFront[start] = models.VisitedVal{Depth: 0, Path: make([]string, 0, 5)}
-	visitedBack[goal] = models.VisitedVal{Depth: 0, Path: make([]string, 0, 5)}
-
-	for queueFront.Len() > 0 && queueBack.Len() > 0 {
-		fmt.Println(len(visitedFront), "Len")
-		if answerPath, err := processQueue(queueFront, visitedFront, visitedBack, true); err != nil || answerPath != nil {
-			// fmt.Println(visitedFront["https://en.wikipedia.org/wiki/Hemp"], " front\n")
-			return answerPath, err
-		}
-		if answerPath, err := processQueue(queueBack, visitedBack, visitedFront, false); err != nil || answerPath != nil {
-			// fmt.Println(visitedFront["https://en.wikipedia.org/wiki/Hemp"], " back\n")
-			// fmt.Println(visitedBack["https://en.wikipedia.org/wiki/Hemp"], " back\n")
-
-			return answerPath, err
-		}
-	}
-	return nil, fmt.Errorf("path not found")
-}
-
-func processQueue(queue *list.List, visitedThis, visitedOther map[string]models.VisitedVal, isFront bool) ([]string, error) {
-	if queue.Len() == 0 {
-		return nil, nil
-	}
-
-	path := queue.Remove(queue.Front()).([]string)
-	lastNode := path[len(path)-1]
-
-	links, err := ScrapeWikipediaQuery(lastNode)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, link := range links {
-
-		// if otherValue, exist := visitedOther[link]; exist {
-		// 	if !isFront {
-		// 		if validatePath(link, path) {
-		// 			combinedPath := combinePaths(otherValue.Path, link, reverseSlice(path))
-		// 			return combinedPath, nil
-		// 		} else {
-		// 			if _, exist := visitedThis[link]; !exist {
-
-		// 				visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}
-		// 				newPath := append(make([]string, 0, len(path)+1), path...)
-		// 				newPath = append(newPath, link)
-		// 				queue.PushBack(newPath)
-		// 			}
-		// 			delete(visitedOther, link)
-
-		// 		}
-		// 	} else {
-		// 		if validatePath(link, otherValue.Path) {
-		// 			combinedPath := combinePaths(path, link, reverseSlice(otherValue.Path))
-		// 			return combinedPath, nil
-		// 		} else {
-		// 			if _, exist := visitedThis[link]; !exist {
-
-		// 				visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}
-		// 				newPath := append(make([]string, 0, len(path)+1), path...)
-		// 				newPath = append(newPath, link)
-		// 				queue.PushBack(newPath)
-		// 			}
-		// 			delete(visitedOther, link)
-
-		// 		}
-
-		// 	}
-		// } else {
-
-		// 	if _, exist := visitedThis[link]; !exist {
-
-		// 		visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}
-		// 		newPath := append(make([]string, 0, len(path)+1), path...)
-		// 		newPath = append(newPath, link)
-		// 		queue.PushBack(newPath)
-		// 	}
-		// }
-
-		if isFront {
-			value, exist := visitedOther[link]
-			if exist {
-				if validatePath(link, value.Path) {
-					return combinePaths(path, link, value.Path), nil
-				}
-
-			} else {
-				if _, exist2 := visitedThis[link]; !exist2 {
-					visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}
-					newPath := make([]string, 0, len(path)+1)
-					copy(newPath, path)
-					newPath = append(newPath, link)
-					queue.PushBack(newPath)
-				}
-			}
-		} else {
-			value, exist := visitedOther[link]
-			if exist {
-				if validatePath(link, path) {
-					return combinePaths(value.Path, link, path), nil
-				}
-			} else {
-				if _, exist2 := visitedThis[link]; !exist2 {
-					visitedThis[link] = models.VisitedVal{Depth: visitedThis[lastNode].Depth + 1, Path: append(visitedThis[lastNode].Path, lastNode)}
-					newPath := make([]string, 0, len(path)+1)
-					copy(newPath, path)
-					newPath = append(newPath, link)
-					queue.PushBack(newPath)
-				}
-			}
-		}
-	}
-	return nil, nil
-}
-
-func validatePath(meetingPoint string, backPath []string) bool {
-	fullPath := append(backPath, meetingPoint)
-
-	for i := len(fullPath) - 1; i >= 1; i-- {
-		if !isValidTransition(fullPath[i], fullPath[i-1]) {
-			return false
-		}
-	}
-	return true
-}
-
-func isValidTransition(from, to string) bool {
-	links, err := ScrapeWikipediaQuery(from)
-	if err != nil {
-		return false
-	}
-
-	for _, link := range links {
-		if link == to {
+	for _, ns := range excludedNamespaces2 {
+		if regexp.MustCompile(`^` + regexp.QuoteMeta(ns)).MatchString(link) {
 			return true
 		}
 	}
 	return false
 }
 
-func combinePaths(frontPath []string, link string, backPath []string) []string {
+func ScrapeMultipleWikipediaLinks(urls []string, cache *sync.Map) ([]string, error) {
+	// Create a collector
+	c := colly.NewCollector(
+		colly.Async(true),
+	)
 
-	frontPath = append(frontPath, link)
-	combinedPath := append(frontPath, backPath...)
-	return combinedPath
-}
-
-func reverseSlice(s []string) []string {
-	a := make([]string, len(s))
-	for i, v := range s {
-		a[len(s)-1-i] = v
+	// Create a queue with 2 consumer threads
+	q, err := queue.New(
+		100, // Number of consumer threads
+		&queue.InMemoryQueueStorage{MaxSize: len(urls)}, // Use default queue storage
+	)
+	if err != nil {
+		return nil, err
 	}
-	return a
-}
 
-// func BFS4(start string, goal string) ([]string, error) {
-// 	queue := list.New()
-// 	queue.PushBack([]models.Node{{Name: start, IsBegin: true}})
-// 	queue.PushBack([]models.Node{{Name: goal, IsBegin: false}})
-
-// 	// foundDepth := -1
-
-// 	visited := make(map[string]models.VisitedVal)
-// 	visited[start] = models.VisitedVal{Depth: 0, IsBegin: true, Path: make([]string, 0, 5)}
-// 	visited[goal] = models.VisitedVal{Depth: 0, IsBegin: false, Path: make([]string, 0, 5)}
-
-// 	for queue.Len() > 0 {
-// 		path := queue.Remove(queue.Front()).([]models.Node)
-// 		lastNode := path[len(path)-1]
-
-// 		links, err := ScrapeWikipediaColly(lastNode.Name)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-
-// 		for _, link := range links {
-// 			value, exist := visited[link]
-// 			if exist && value.IsBegin != lastNode.IsBegin {
-// 				// foundDepth = value.Depth + len(path) + 1
-// 				answerPath, err := combine(path, value.Path, link, lastNode.IsBegin)
-// 				if err != nil {
-// 					visited[link] = models.VisitedVal{Depth: visited[lastNode.Name].Depth + 1, IsBegin: lastNode.IsBegin, Path: append(visited[lastNode.Name].Path, lastNode.Name)}
-// 					newPath := make([]models.Node, len(path)+1)
-// 					copy(newPath, path)
-// 					newPath[len(path)] = models.Node{Name: link, IsBegin: lastNode.IsBegin}
-// 					queue.PushBack(newPath)
-// 					continue
-// 				}
-
-// 				return answerPath, nil
-// 			}
-
-// 			if !exist {
-// 				visited[link] = models.VisitedVal{Depth: visited[lastNode.Name].Depth + 1, IsBegin: lastNode.IsBegin, Path: append(visited[lastNode.Name].Path, lastNode.Name)}
-// 				newPath := make([]models.Node, len(path)+1)
-// 				copy(newPath, path)
-// 				newPath[len(path)] = models.Node{Name: link, IsBegin: lastNode.IsBegin}
-// 				queue.PushBack(newPath)
-// 			}
-// 		}
-// 	}
-// 	return nil, fmt.Errorf("path not found")
-// }
-
-func combine(arr []models.Node, arr2 []string, value string, isBegin bool) ([]string, error) {
-
-	arr = append(arr, models.Node{Name: value, IsBegin: isBegin})
-	arr2 = append(arr2, value)
-
-	if isBegin {
-
-		for ctr := len(arr2) - 1; ctr >= 1; ctr-- {
-			linkWiki := arr2[ctr]
-			links, err := ScrapeWikipediaColly(linkWiki)
-			if err != nil {
-				return nil, fmt.Errorf("Combiner path failed")
-			}
-
-			found := false
-			for _, link := range links {
-				if link == arr2[ctr-1] {
-					found = true
-					break
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		// Check if the link matches the combined regex
+		if combinedRegex.MatchString(link) {
+			fullLink := "https://en.wikipedia.org" + link
+			urlKey := e.Request.URL.String()
+			// Safely append the link to the slice for the URL
+			cache.Store(urlKey, func(value interface{}) interface{} {
+				if value == nil {
+					return []string{fullLink}
 				}
-			}
-
-			if !found {
-				return nil, fmt.Errorf("Combiner path failed")
-			}
+				return append(value.([]string), fullLink)
+			})
 		}
+	})
 
-	} else {
+	// Handle errors
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+	})
 
-		for ctr := len(arr) - 1; ctr >= 1; ctr-- {
-			linkWiki := arr[ctr]
-			links, err := ScrapeWikipediaColly(linkWiki.Name)
-			if err != nil {
-				return nil, fmt.Errorf("Combiner path failed")
-
-			}
-
-			found := false
-			for _, link := range links {
-				if link == arr[ctr-1].Name {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				return nil, fmt.Errorf("Combiner path failed")
-
-			}
-		}
-
+	// Add all URLs to the queue
+	for _, url := range urls {
+		q.AddURL(url)
 	}
 
-	var length int = len(arr) + len(arr2) - 1
-	fmt.Println(len(arr), " ", len(arr2))
+	// Consume URLs
+	q.Run(c)
 
-	newPath := make([]string, length)
-
-	if isBegin {
-		lenBefore := 0
-
-		for _, val := range arr {
-			newPath[lenBefore] = val.Name
-			lenBefore++
-		}
-
-		for i := len(arr2) - 2; i >= 0; i-- {
-			newPath[lenBefore] = arr2[i]
-			lenBefore++
-		}
-	} else {
-		lenBefore := 0
-
-		for _, val := range arr2 {
-			newPath[lenBefore] = val
-			lenBefore++
-		}
-
-		for i := len(arr) - 2; i >= 0; i-- {
-			newPath[lenBefore] = arr[i].Name
-			lenBefore++
-		}
-	}
-
-	return newPath, nil
-
+	// Wait until threads are finished
+	c.Wait()
+	return []string{}, nil
 }
 
-func combine2(arr []string, arr2 []string, value string) ([]string, error) {
+func DecodePercentEncodedString(encodedString string) (string) {
+    decodedString, err := url.QueryUnescape(encodedString)
+    if err != nil {
+        return encodedString // return the error if the decoding fails
+    }
+    return decodedString
+}
 
-	arr = append(arr, value)
-	arr2 = append(arr2, value)
-
-	for ctr := len(arr2) - 1; ctr >= 1; ctr-- {
-		linkWiki := arr2[ctr]
-		links, err := ScrapeWikipediaColly(linkWiki)
+func ScrapeWikipediaLinks(url string) ([]string, error) {
+	if exist, err := repository.GetChildrenByParent(url); exist != nil {
 		if err != nil {
-			return nil, fmt.Errorf("Combiner path failed")
+			return nil, err
+		}
+		return exist, nil
+	}
+
+	result := make([]string, 0)
+
+	c := colly.NewCollector(
+		colly.AllowedDomains("wikipedia.org", "en.wikipedia.org"),
+	)
+
+	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+
+	c.SetRequestTimeout(15 * time.Second)
+
+	c.Limit(&colly.LimitRule{
+		Parallelism: 1,
+	})
+
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		if !isVisible(e) {
+			return
 		}
 
-		found := false
-		for _, link := range links {
-			if link == arr2[ctr-1] {
-				found = true
-				break
+		link := e.Attr("href")
+		if combinedRegex.MatchString(link) {
+			fullLink := "https://en.wikipedia.org" + link
+			if !isExcluded(link) {
+				result = append(result, fullLink)
 			}
 		}
+	})
 
-		if !found {
-			return nil, fmt.Errorf("Combiner path failed")
+	var attempt int
+	maxAttempts := 1
+	c.OnError(func(r *colly.Response, err error) {
+		if r.StatusCode == 0 { // Network error, possibly a timeout
+			attempt++
+			if attempt < maxAttempts {
+				fmt.Println("Retrying:", r.Request.URL)
+				r.Request.Retry()
+			} else {
+				fmt.Println("Request failed after retries:", r.Request.URL, "\nError:", err)
+			}
+		}
+	})
+
+	c.OnRequest(func(r *colly.Request) {
+	})
+
+	c.Visit(url)
+
+	if len(result) > 0 {
+
+		err := repository.SaveArticleWithChildren(url, result)
+		if err != nil {
+			fmt.Println(err)
 		}
 	}
 
-	var length int = len(arr) + len(arr2) - 1
-	fmt.Println(len(arr), " ", len(arr2))
+	return result, nil
+}
 
-	newPath := make([]string, length)
-
-	lenBefore := 0
-
-	for _, val := range arr {
-		newPath[lenBefore] = val
-		lenBefore++
+func CompareArrays(arr1, arr2 []string) bool {
+	if len(arr1) != len(arr2) {
+		return false
 	}
 
-	for i := len(arr2) - 2; i >= 0; i-- {
-		newPath[lenBefore] = arr2[i]
-		lenBefore++
+	countMap := make(map[string]int)
+
+	for _, item := range arr1 {
+		countMap[item]++
 	}
 
-	return newPath, nil
+	for _, item := range arr2 {
+		if countMap[item] == 0 {
+			return false
+		}
+		countMap[item]--
+	}
 
+	for _, count := range countMap {
+		if count != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isVisible(e *colly.HTMLElement) bool {
+	class := e.Attr("class")
+	class = strings.ReplaceAll(class, " ", "")
+	if strings.Contains(class, "nowraplinks") {
+		return false
+	}
+
+	// Check parent elements for visibility
+	for parent := e.DOM.Parent(); parent.Length() != 0; parent = parent.Parent() {
+
+		parentClass, found := parent.Attr("class")
+		parentClass = strings.ReplaceAll(parentClass, " ", "")
+		if found && strings.Contains(parentClass, "nowraplinks") {
+			return false
+		}
+	}
+	return true
+}
+
+func helperMulti(urls *list.List, goal string, visited *sync.Map, sem chan struct{}, wg *sync.WaitGroup, count *uint32) [][]string {
+	var mu sync.Mutex
+	var allPath [][]string
+
+	size := urls.Len()
+
+	for i := 0; i < size; i++ {
+		path := urls.Remove(urls.Front()).([]string)
+		last := path[len(path)-1]
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(url string, goal string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			res, _ := ScrapeWikipediaLinks(url)
+			for _, u := range res {
+				if u == goal {
+					newPath := make([]string, len(path))
+					copy(newPath, path)
+					newPath = append(newPath, u)
+					mu.Lock()
+					allPath = append(allPath, newPath)
+					fmt.Println(allPath)
+					mu.Unlock()
+
+				} else {
+
+					if _, exist := visited.LoadOrStore(u, true); !exist {
+						newPath := make([]string, len(path))
+						copy(newPath, path)
+						newPath = append(newPath, u)
+						atomic.AddUint32(count, 1)
+						mu.Lock()
+						urls.PushBack(newPath)
+						mu.Unlock()
+					}
+				}
+
+			}
+		}(last, goal)
+	}
+
+	wg.Wait()
+
+	if len(allPath) > 0 {
+		fmt.Println(len(allPath))
+		return allPath
+	} else {
+		return nil
+	}
+
+}
+
+func AsyncBFSMulti(start, goal string) ([][]string, int) {
+	var visited sync.Map
+	semp := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+	var countChecked uint32 = 1
+
+	if(start == goal){
+		return [][]string{{start}}, 1
+	}
+
+	queue := list.New()
+	queue.PushBack([]string{start})
+	visited.Store(start, true)
+
+	i := 0
+	for queue.Len() > 0 {
+		i++
+		fmt.Println("DEPTH: ", i)
+		r := helperMulti(queue, goal, &visited, semp, &wg, &countChecked)
+		if r != nil {
+			return r, int(countChecked)
+		}
+	}
+
+	return nil, int(countChecked)
+}
+
+func AsyncBFS(start, goal string) ([]string, int) {
+	var parent sync.Map
+	var visited sync.Map
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
+	var countChecked uint32
+
+	var resultPath []string
+	var found bool
+
+	queue := []string{start}
+	visited.Store(start, true)
+
+	if(start == goal){
+		return []string{start}, 1
+	}
+
+	for len(queue) > 0 && !found {
+		local := queue
+		queue = []string{}
+
+		batchsize := (len(local) / maxConcurrency) + 1
+		fmt.Println(batchsize)
+
+		for i := 0; i < len(local); i += batchsize {
+			end := i + batchsize
+			if end > len(local) {
+				end = len(local)
+			}
+			wg.Add(1)
+			go func(links []string) {
+				defer wg.Done()
+
+				for _, url := range links {
+					res, _ := ScrapeWikipediaLinks(url)
+					for _, link := range res {
+						mutex.Lock()
+						if found {
+							mutex.Unlock()
+							return
+						}
+						mutex.Unlock()
+
+						if link == goal {
+							path := []string{goal}
+							for at := url; at != start; {
+								path = append([]string{at}, path...)
+								tes, _ := parent.Load(at)
+								at = tes.(string)
+							}
+							path = append([]string{start}, path...)
+
+							mutex.Lock()
+							if !found {
+								resultPath = path
+								found = true
+								fmt.Println(resultPath)
+							}
+							mutex.Unlock()
+							return
+						}
+
+						if _, exist := visited.LoadOrStore(link, true); !exist {
+							atomic.AddUint32(&countChecked, 1)
+
+							parent.Store(link, url)
+							mutex.Lock()
+							if !found {
+								queue = append(queue, link)
+							} else {
+								mutex.Unlock()
+
+								return
+							}
+							mutex.Unlock()
+						}
+					}
+				}
+
+			}(local[i:end])
+		}
+		wg.Wait()
+	}
+
+	if found {
+		return resultPath, int(countChecked)
+	}
+
+	return nil, int(countChecked)
 }
