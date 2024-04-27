@@ -7,7 +7,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           <div className="flex justify-end flex-1">
             <a href="./about" className="hover:text-[#FF6B6B] hover:scale-110 focus:scale-110 duration-300 transition ease-in-out delay-50">About</a>
-            <a href="" className="hover:text-[#FF6B6B] hover:scale-110 focus:scale-110 duration-300 transition ease-in-out delay-50 ml-4">Docs</a>
+            <a href="./GoPat.pdf" download="GoPat.pdf" className="hover:text-[#FF6B6B] hover:scale-110 focus:scale-110 duration-300 transition ease-in-out delay-50 ml-4">Docs</a>
           </div>
 
           <div className="flex justify-center">
